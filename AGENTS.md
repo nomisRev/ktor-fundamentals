@@ -1,0 +1,8 @@
+- Use `agent-browser --help` CLI to check the slides but make sure to close it when you are done
+- You can find Slidev SKILLS here, node_modules/@slidev/cli/skills/slidev/SKILL.md
+- In doubt read code in node_modules to understand the libraries you need to work with
+- slidev-theme-kotlin can be found in ../slidedev-theme-kotlin
+- Write slides in Simon's voice: load the `kotlin-slides-voice` skill before touching lessons/*.md
+- Find Ktor documentation here: https://ktor.io/docs/ (the deck targets Ktor 3.5.2)
+- Use `slidev --help` and your extensions read-slide. A server should be running on port 3030.
+- After changing a Kotlin fence run `npm run snippets && ./gradlew build`; mark a fence that is deliberately partial with `no-compile`
