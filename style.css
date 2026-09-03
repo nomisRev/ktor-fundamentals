@@ -367,3 +367,7 @@ html.dark .closing-slide::after { background: radial-gradient(circle, rgb(235 85
     -webkit-print-color-adjust: exact;
   }
 }
+
+/* Lesson 9: configuration and deployment. The servlet-class line of web.xml
+   is 88 columns; widen the code window on that one slide. */
+.servlet-slide { --code-window-columns: 90; }
