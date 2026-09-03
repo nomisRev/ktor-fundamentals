@@ -6,3 +6,4 @@
 - Find Ktor documentation here: https://ktor.io/docs/ (the deck targets Ktor 3.5.2)
 - Use `slidev --help` and your extensions read-slide. A server should be running on port 3030.
 - After changing a Kotlin fence run `npm run snippets && ./gradlew build`; mark a fence that is deliberately partial with `no-compile`
+- Ktor sources are checked out at ~/Developer/ktor and the docs at ~/Developer/ktor-documentation (`topics/`, `codeSnippets/snippets/`); grep them to verify an API
