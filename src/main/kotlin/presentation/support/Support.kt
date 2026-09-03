@@ -6,10 +6,22 @@
 // declaration in the file's own package wins over a star import.
 package presentation.support
 
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.resources.Resources
+import io.ktor.client.plugins.resources.get
+import io.ktor.http.HttpStatusCode
 import io.ktor.resources.Resource
+import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.response.respond
+import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 // ---------------------------------------------------------------------------
 // Type-safe routes shared across lessons
@@ -60,6 +72,63 @@ interface GitHubService {
 interface CacheService {
   suspend fun get(key: String): String?
   suspend fun update(key: String, value: String)
+}
+
+/** The page a handler in lesson 5 answers with: user info plus repositories. */
+@Serializable
+data class Profile(val user: User, val repos: List<Repo>)
+
+/** The server-side route that shows a GitHub profile (lesson 5). */
+@Serializable
+@Resource("/github/{username}")
+class GitHubProfile(val username: String)
+
+/** GitHub's routes as client resources; the slides define this object once. */
+object GitHub {
+  @Serializable
+  @Resource("/users/{username}")
+  class User(val username: String) {
+    @Serializable
+    @Resource("repos")
+    class Repos(val user: User)
+  }
+
+  @Serializable
+  @Resource("/repos/{owner}/{repo}")
+  class Repo(val owner: String, val repo: String)
+}
+
+/** The client factory the lesson 5 slides build step by step. */
+fun client(): HttpClient = HttpClient(CIO) {
+  install(ContentNegotiation) {
+    json(Json { ignoreUnknownKeys = true })
+  }
+  install(Resources)
+  defaultRequest { url("https://api.github.com") }
+}
+
+/** The HTTP implementation of [GitHubService] the DI slides provide. */
+class GitHubHttp(
+  private val client: HttpClient,
+) : GitHubService, AutoCloseable {
+  override suspend fun getUserInfo(user: String): User? =
+    client.get(GitHub.User(user))
+      .takeIf { it.status == HttpStatusCode.OK }
+      ?.body<User>()
+
+  override suspend fun getUserRepos(user: String): List<Repo>? =
+    client.get(GitHub.User.Repos(GitHub.User(user)))
+      .takeIf { it.status == HttpStatusCode.OK }
+      ?.body<List<Repo>>()
+
+  override fun close() = client.close()
+}
+
+/** The handler the DI slides wire up: the one from "Handlers depend on the service". */
+suspend fun RoutingContext.github(github: GitHubService, user: String) {
+  val info = github.getUserInfo(user)
+  if (info == null) call.respond(HttpStatusCode.NotFound)
+  else call.respond(Profile(info, github.getUserRepos(user).orEmpty()))
 }
 
 // ---------------------------------------------------------------------------
