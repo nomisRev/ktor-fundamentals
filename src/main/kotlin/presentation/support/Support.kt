@@ -22,6 +22,8 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.install
+import io.ktor.server.auth.UserIdPrincipal
+import io.ktor.server.auth.UserPasswordCredential
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.RoutingContext
@@ -165,6 +167,18 @@ val secret: String = "supersecret"
 
 // Names the response examples in lesson 2 look up before answering `404`.
 val users: Set<String> = setOf("Alex")
+
+// ---------------------------------------------------------------------------
+// Authentication (lesson 8)
+
+/** The session class the login writes and the session provider reads back. */
+@Serializable
+data class UserInfo(val name: String, val timezone: String)
+
+/** The validation function the providers share: a principal, or `null`. */
+fun checkCredentials(credentials: UserPasswordCredential): UserIdPrincipal? =
+  if (credentials.password == "supersecret") UserIdPrincipal(credentials.name)
+  else null
 
 // ---------------------------------------------------------------------------
 // WebSockets and OpenAPI (lesson 6)
