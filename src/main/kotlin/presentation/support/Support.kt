@@ -13,13 +13,25 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.resources.Resources
 import io.ktor.client.plugins.resources.get
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
+import io.ktor.http.withCharset
 import io.ktor.resources.Resource
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.createApplicationPlugin
+import io.ktor.server.application.install
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.RoutingContext
+import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import io.ktor.server.testing.testApplication
+import kotlinx.html.body
+import kotlinx.html.h1
+import kotlinx.html.html
+import kotlinx.html.stream.createHTML
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -174,4 +186,63 @@ suspend fun RoutingContext.greet() {
     ?: return call.respond(HttpStatusCode.BadRequest)
   val hello = if (call.request.queryParameters["lang"] == "nl") "Hallo" else "Hello"
   call.respond(GreetingResponse("$hello, $name"))
+}
+
+// ---------------------------------------------------------------------------
+// Status pages, testing and metrics (lesson 7)
+
+/** The application the lesson 7 tests start: the greeting routes of lesson 3. */
+fun Application.module() {
+  routing {
+    get("/greet/{name}/bye") {
+      call.respondText("Bye, ${call.parameters["name"]}")
+    }
+    get("/greet/{name}/hello/{hour}") {
+      call.respondText("Hello, ${call.parameters["name"]}")
+    }
+  }
+}
+
+/** The same application plus the GitHub profile route of lesson 5, behind [github]. */
+fun Application.module(github: GitHubService) {
+  module()
+  install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) { json() }
+  routing {
+    get("/github/{username}") {
+      val user = call.parameters["username"]
+        ?: return@get call.respond(HttpStatusCode.BadRequest)
+      github(github, user)
+    }
+  }
+}
+
+/** The marker a handler responds with when it wants the "say please" page. */
+@Serializable
+object SayPlease
+
+/** The plug-in of the custom status page slides, so that `install(FourOhFour)` compiles. */
+val FourOhFour = createApplicationPlugin("FourOhFour") {
+  onCallRespond { call ->
+    transformBody { body ->
+      when (body) {
+        is SayPlease -> TextContent(
+          text = createHTML().html { body { h1 { +"Say please" } } },
+          contentType = ContentType.Text.Html.withCharset(Charsets.UTF_8),
+          status = HttpStatusCode.Forbidden,
+        )
+        else -> body
+      }
+    }
+  }
+}
+
+/** The test helper the testing slides build: application plus a configured client. */
+fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
+  application { module() }
+  val client = createClient {
+    install(ContentNegotiation) { json() }
+    install(Resources)
+    expectSuccess = true
+  }
+  test(client)
 }
