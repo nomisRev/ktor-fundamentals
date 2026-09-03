@@ -81,3 +81,6 @@ val loggedIn: Boolean = true
 val name: String = "Alex"
 val tz: String = "CET"
 val secret: String = "supersecret"
+
+// Names the response examples in lesson 2 look up before answering `404`.
+val users: Set<String> = setOf("Alex")
