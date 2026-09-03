@@ -153,3 +153,25 @@ val secret: String = "supersecret"
 
 // Names the response examples in lesson 2 look up before answering `404`.
 val users: Set<String> = setOf("Alex")
+
+// ---------------------------------------------------------------------------
+// WebSockets and OpenAPI (lesson 6)
+
+/** One frame in, one frame out: the JSON messages on the `/greet` socket. */
+@Serializable
+data class Request(val name: String)
+
+@Serializable
+data class Response(val greeting: String)
+
+/** The body the documented greeting route answers with. */
+@Serializable
+data class GreetingResponse(val message: String)
+
+/** The greeting handler the OpenAPI slides document without repeating its body. */
+suspend fun RoutingContext.greet() {
+  val name = call.parameters["name"]
+    ?: return call.respond(HttpStatusCode.BadRequest)
+  val hello = if (call.request.queryParameters["lang"] == "nl") "Hallo" else "Hello"
+  call.respond(GreetingResponse("$hello, $name"))
+}
