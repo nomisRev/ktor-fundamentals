@@ -11,16 +11,12 @@ import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.statuspages.StatusPages
 import kotlinx.html.body
 import kotlinx.html.h1
-import kotlinx.html.p
 
 fun Application.module() {
   install(StatusPages) {
-    exception<Throwable> { call, cause ->
-      call.respondHtml(HttpStatusCode.InternalServerError) {
-        body {
-          h1 { +"This is embarrassing" }
-          cause.message?.let { p { +it } }
-        }
+    status(HttpStatusCode.NotFound) { call, status ->
+      call.respondHtml(status) {
+        body { h1 { +"Keep looking somewhere else" } }
       }
     }
   }

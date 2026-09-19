@@ -21,6 +21,6 @@ fun client(): HttpClient = HttpClient(CIO) {
   defaultRequest { url("https://api.github.com") }
   install(HttpRequestRetry) {
     retryOnServerErrors(maxRetries = 5)
-    exponentialDelay()
+    constantDelay(millis = 1000)
   }
 }

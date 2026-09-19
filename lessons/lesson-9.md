@@ -65,6 +65,8 @@ magic-move
 <DrawnAnnotation text="configure = {" label="Engine options: thread pools, time-outs, and the connectors" :geometry="{ label: { x: 0.7, y: 0.336, width: 0.4 } }" />
 <DrawnAnnotation text="connector {" label="One listener; add another for TLS on `8443`" :geometry="{ label: { x: 0.7, y: 0.47, width: 0.36 } }" />
 
+<TypeHint :line="4" receiver="NettyApplicationEngine.Configuration">
+
 ```kotlin
 import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
@@ -82,6 +84,8 @@ fun main() {
   ) { module() }.start(wait = true)
 }
 ```
+
+</TypeHint>
 
 <!--
 The `port` and `host` parameters are a shortcut for this. `configure`

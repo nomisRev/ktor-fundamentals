@@ -3,7 +3,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "slidev",
+    "dev": "slidev --open",
+    "present": "slidev --remote=secret",
     "build": "slidev build",
     "export": "slidev export",
     "screenshot": "slidev export --format png",
@@ -13,7 +14,7 @@
   "dependencies": {
     "@slidev/cli": "52.19.1",
     "roughjs": "4.6.6",
-    "slidev-theme-kotlin": "file:../slidedev-theme-kotlin",
+    "slidev-theme-kotlin": "0.13.0",
     "vue": "3.5.41"
   },
   "devDependencies": {

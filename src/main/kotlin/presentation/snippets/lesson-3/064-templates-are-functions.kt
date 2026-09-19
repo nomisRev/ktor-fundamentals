@@ -8,6 +8,14 @@ import io.ktor.server.html.respondHtml
 import io.ktor.server.routing.RoutingContext
 import kotlinx.html.*
 
+fun FlowContent.notEmpty(
+  value: String,
+  emptyMessage: String,
+  content: FlowContent.() -> Unit,
+) {
+  if (value.isEmpty()) +emptyMessage else content()
+}
+
 suspend fun RoutingContext.spell(req: Spell) {
   call.respondHtml {
     body {
@@ -19,12 +27,4 @@ suspend fun RoutingContext.spell(req: Spell) {
       }
     }
   }
-}
-
-fun FlowContent.notEmpty(
-  value: String,
-  emptyMessage: String,
-  content: FlowContent.() -> Unit,
-) {
-  if (value.isEmpty()) +emptyMessage else content()
 }

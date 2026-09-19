@@ -6,22 +6,16 @@ package presentation.snippets.lesson4.slide71
 import presentation.support.*
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import io.ktor.server.sessions.SessionStorageMemory
 import io.ktor.server.sessions.Sessions
 import io.ktor.server.sessions.cookie
-import io.ktor.server.sessions.header
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class GreetingTracker(val greetings: Set<String>)
 
-@Serializable
-data class SecretInfo(val secret: String)
-
 fun Application.module() {
   install(Sessions) {
     cookie<GreetingTracker>("track")
-    header<SecretInfo>("secret", SessionStorageMemory())
   }
   routes()
 }

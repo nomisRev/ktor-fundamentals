@@ -12,13 +12,11 @@ kodee: wave
 
 ## Two-way messages, described APIs
 
-- `webSocket("/greet") { for (frame in incoming) }` → one connection, many frames
-- `receiveDeserialized<T>()`, `sendSerialized(…)` → one object per frame
-- `ktor { openApi { enabled = true } }`, `/** Path: … */` → routes and comments, read by the compiler
-- `.describe { }`, `.hide()` → the runtime has the last word
-- `openAPI("/openapi")`, `swaggerUI("/swagger")` → two routes publish it
+---
 
-> HTTP is one request, one response; a WebSocket is one connection both sides write to
+# HTTP answers, a WebSocket stays open
+
+> One request, one response; or one connection both sides write to
 
 | `HTTP/1.1 101 Switching Protocols` | the handshake: a `GET` with `Upgrade: websocket`     |
 |------------------------------------|-------------------------------------------------------|
@@ -96,6 +94,9 @@ magic-move
 <DrawnAnnotation text="is Frame.Text" label="Frames are types: text here; binary, ping, and close take other branches" :geometry="{ label: { x: 0.74, y: 0.62, width: 0.42 } }" />
 <DrawnAnnotation text="send(" label="`send` writes one text frame to `outgoing`" :geometry="{ label: { x: 0.74, y: 0.72, width: 0.36 } }" />
 
+<TypeHint :line="3" receiver="DefaultWebSocketServerSession">
+<SmartCast :line="6" text="frame">
+
 ```kotlin
 import io.ktor.server.application.Application
 import io.ktor.server.routing.routing
@@ -117,6 +118,9 @@ fun Application.routes() {
   }
 }
 ```
+
+</SmartCast>
+</TypeHint>
 
 <!--
 `webSocket` is a route like `get`, but its block is a
@@ -344,10 +348,11 @@ ktor {
 
 <!--
 The extension runs at compile time and generates Kotlin that registers
-the metadata at start-up; nothing is inspected by reflection. It
-officially targets Kotlin 2.2.20, other compiler versions may fail to
-compile. Dependencies: `ktor-server-routing-openapi` for the runtime
-metadata API, `ktor-server-openapi` and `ktor-server-swagger` to serve it.
+the metadata at start-up; nothing is inspected by reflection. It needs
+Kotlin 2.4.0 or newer: on an older compiler the Gradle plug-in skips the
+extension with a warning and the document stays empty. `enabled = true`
+adds `ktor-server-routing-openapi`, the runtime metadata API, for you;
+`ktor-server-openapi` and `ktor-server-swagger` serve the document.
 Inference follows extracted handler functions where it can; `// ignore!`
 above a route excludes it when inference gets it wrong.
 -->
@@ -356,7 +361,7 @@ above a route excludes it when inference gets it wrong.
 
 # A comment documents the route
 
-<DrawnAnnotation text="Greet a person by name." label="The first line is the summary; the extension turns the comment into metadata" :geometry="{ label: { x: 0.72, y: 0.27, width: 0.4 } }" />
+<DrawnAnnotation text="Greet a person by name." label="The text before the first keyword is the summary; the extension turns the comment into metadata" :geometry="{ label: { x: 0.72, y: 0.27, width: 0.4 } }" />
 <DrawnAnnotation text="call.parameters[&quot;name&quot;]" label="Inferred: `name` is a path parameter" :geometry="{ label: { x: 0.78, y: 0.4, width: 0.32 } }" />
 <DrawnAnnotation text="call.respond(GreetingResponse(" label="Inferred: a `200` whose schema is `GreetingResponse`" :geometry="{ label: { x: 0.7, y: 0.62, width: 0.4 } }" />
 
@@ -534,6 +539,9 @@ security schemes. The default `source` looks for
 routing tree, so a hand-written specification still works. `openAPI` runs
 `swagger-codegen` at start-up and serves the static HTML it produced;
 the documented routes are registered in this same `routing` block.
+Since 3.5.2 it warns at start-up that `swagger-codegen` only officially
+supports OpenAPI 3.0.x while the routing source emits 3.1.1: the HTML
+may be incomplete, Swagger UI is the one to rely on.
 -->
 
 ---
@@ -562,6 +570,7 @@ fun Application.routes() {
     swaggerUI("/swagger") {
       info = OpenApiInfo("Greeting API", "1.0.0")
       source = OpenApiDocSource.Routing(ContentType.Application.Json)
+      remotePath = "openapi.json"
     }
   }
 }
@@ -569,8 +578,9 @@ fun Application.routes() {
 
 <!--
 Swagger UI is the interactive one: try a route from the browser, see the
-schemas. It serves the document itself under `remotePath`, `openapi.json`
-here since the source is JSON. Both
+schemas. It serves the document itself under `remotePath`, which
+defaults to `documentation.yaml` whatever the content type, so name it
+`openapi.json` when the source is JSON. Both
 plug-ins hide their own routes from the document.
 -->
 
@@ -605,6 +615,7 @@ fun Application.routes() {
     swaggerUI("/swagger") {
       info = OpenApiInfo("Greeting API", "1.0.0")
       source = OpenApiDocSource.Routing(ContentType.Application.Json)
+      remotePath = "openapi.json"
     }
     get("/health") { call.respondText("ok") }.hide()
   }

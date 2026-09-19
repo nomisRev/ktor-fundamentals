@@ -124,6 +124,8 @@ magic-move
 <DrawnAnnotation text="UserIdPrincipal(credentials.name)" label="Any object is a principal: the built-in one carries a name" :geometry="{ label: { x: 0.76, y: 0.5, width: 0.36 } }" />
 <DrawnAnnotation text="null" label="Refused: the challenge is sent again" :geometry="{ label: { x: 0.72, y: 0.62, width: 0.3 } }" />
 
+<TypeHint :line="3" receiver="BasicAuthenticationProvider.Config">
+
 ```kotlin
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -147,6 +149,8 @@ fun Application.module() {
   routes()
 }
 ```
+
+</TypeHint>
 
 <!--
 `validate` receives a `UserPasswordCredential` and answers with the

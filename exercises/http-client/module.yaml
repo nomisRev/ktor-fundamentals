@@ -1,0 +1,18 @@
+product: jvm/lib
+
+apply:
+  - ../common.module-template.yaml
+
+dependencies:
+  - io.ktor:ktor-server-core:3.5.2
+  - io.ktor:ktor-server-content-negotiation:3.5.2
+  - io.ktor:ktor-server-di:3.5.2
+  - io.ktor:ktor-serialization-kotlinx-json:3.5.2
+  - io.ktor:ktor-client-core:3.5.2
+  - io.ktor:ktor-client-cio:3.5.2
+  - io.ktor:ktor-client-content-negotiation:3.5.2
+  - io.ktor:ktor-client-resources:3.5.2
+  - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0
+
+test-dependencies:
+  - io.ktor:ktor-server-test-host:3.5.2

@@ -1,0 +1,31 @@
+package sessions
+
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.http.content.staticResources
+import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.resources.Resources
+import io.ktor.server.resources.get
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.routing
+
+fun Route.assets() {
+  staticResources("/assets", "static")
+}
+
+fun Application.cors() {
+  install(CORS) {
+    allowHost("app.example.com", schemes = listOf("https"))
+  }
+}
+
+fun Application.module() {
+  sessions()
+  cors()
+  install(Resources)
+  routing {
+    assets()
+    get<Greeting.Hello> { hello(it) }
+    get<Greeting.Bye> { bye(it) }
+  }
+}

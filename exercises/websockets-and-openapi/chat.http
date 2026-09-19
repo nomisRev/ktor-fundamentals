@@ -1,0 +1,13 @@
+### Exercise 2 / 4: talk to the socket from IntelliJ IDEA's HTTP client.
+### Run the module in the project of lesson 1 first, then click the gutter
+### icon; every `===` block is one frame, `=== wait-for-server` waits for the echo.
+WEBSOCKET ws://localhost:8080/chat
+Content-Type: application/json
+
+{"text": "Hello, Ada"}
+
+=== wait-for-server
+
+{"text": "Hello, Linus"}
+
+=== wait-for-server

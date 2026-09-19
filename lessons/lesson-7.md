@@ -44,6 +44,8 @@ its own template. One plug-in owns all three cases.
 <DrawnAnnotation text="status(HttpStatusCode.NotFound)" label="Runs when a handler, or no handler, answers `404`; `Unauthorized` works the same" :geometry="{ label: { x: 0.7, y: 0.52, width: 0.44 } }" />
 <DrawnAnnotation text="call.respondHtml(status)" />
 
+<TypeHint :line="2" receiver="StatusPagesConfig">
+
 ```kotlin
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -64,6 +66,8 @@ fun Application.module() {
   routes()
 }
 ```
+
+</TypeHint>
 
 <!--
 The plug-in intercepts a response with that status and lets you answer
@@ -877,6 +881,8 @@ from service discovery rather than a static list.
 <DrawnAnnotation text="timers { call, throwable ->" label="Runs per request on the `Timer.Builder`: route, method, status are already there" :geometry="{ label: { x: 0.72, y: 0.39, width: 0.44 } }" />
 <DrawnAnnotation text="call.request.headers[&quot;X-Premium&quot;]" label="A tag is a dimension: premium and free traffic side by side in one query" :geometry="{ label: { x: 0.72, y: 0.53, width: 0.44 } }" />
 
+<Warning :line="6" text="throwable" message="Parameter 'throwable' is never used, could be renamed to _">
+
 ```kotlin
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -896,6 +902,8 @@ fun Application.module() {
   routes()
 }
 ```
+
+</Warning>
 
 <!--
 The block sees the call and the exception, if there was one, and may add

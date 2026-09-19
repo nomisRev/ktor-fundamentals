@@ -1,7 +1,14 @@
 ---
 theme: kotlin
 favicon: /ktor.svg
-transition: view-transition
+fonts:
+  sans: JetBrains Sans
+  mono: JetBrains Mono
+  provider: none
+  local:
+    - JetBrains Sans
+    - JetBrains Mono
+transition: fade
 layout: cover
 class: fundamentals-cover
 canvasWidth: 1440
@@ -10,6 +17,8 @@ colorSchema: both
 highlighter: shiki
 themeConfig:
   kodee: greeting
+  drawnAnnotation:
+    connect: false
   siteUrl: https://nomisrev.github.io/ktor-fundamentals/
   snippets:
     dir: src/main/kotlin/presentation/snippets

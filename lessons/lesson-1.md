@@ -171,6 +171,9 @@ gutter. The log comes from logback, which the generator configures for us.
 
 <DrawnAnnotation text="Application.module" label="One piece of the application, apart from `main`" :geometry="{ label: { x: 0.57, y: 0.195, width: 0.4 } }" />
 
+<TypeHint :line="2" receiver="Routing">
+<TypeHint :line="3" receiver="RoutingContext">
+
 ```kotlin
 import io.ktor.server.application.Application
 import io.ktor.server.response.respondText
@@ -185,6 +188,9 @@ fun Application.module() {
   }
 }
 ```
+
+</TypeHint>
+</TypeHint>
 
 <!--
 Ktor calls these pieces modules. Nothing special about the name `module`;

@@ -237,6 +237,9 @@ the body. The handler only ever sees Kotlin objects.
 <DrawnAnnotation text="fun Route.byeRoutes()" label="An extension of `Route`: the same DSL, from anywhere" :geometry="{ label: { x: 0.7, y: 0.53, width: 0.42 } }" />
 <DrawnAnnotation text="delete<Greeting.Bye>" label="More than one route per function" />
 
+<TypeHint :line="3" receiver="Routing">
+<TypeHint :line="10" receiver="RoutingContext">
+
 ```kotlin
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -272,6 +275,9 @@ fun Route.byeRoutes() {
 }
 ```
 
+</TypeHint>
+</TypeHint>
+
 <!--
 One big `routing` block does not scale. `routing { }` passes a `Route`
 receiver to its block, so any `Route.() -> Unit` function slots in; group
@@ -280,10 +286,52 @@ them by feature and keep `module()` as the table of contents.
 
 ---
 
+# Anything that responds suspends
+
+<InlineCompilerError :line="12" text="respondText" message="Suspend function 'suspend fun ApplicationCall.respondText(text: String, contentType: ContentType? = ..., status: HttpStatusCode? = ..., configure: OutgoingContent.() -> Unit = ...): Unit'\ncan only be called from a coroutine or another suspend function." style="--inline-compiler-error-message-size: 1.05rem">
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.resources.Resources
+import io.ktor.server.resources.get
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.RoutingContext
+import io.ktor.server.routing.routing
+
+fun Application.module() {
+  install(Resources)
+  routing {
+    get<Greeting.Bye> { bye(it) }
+    get<Greeting.Hello> { req ->
+      call.respondText("Hello, ${req.parent.name}, it's ${req.hour} o'clock")
+    }
+  }
+}
+
+fun RoutingContext.bye(req: Greeting.Bye) {
+  call.respondText("Bye, ${req.parent.name}")
+}
+```
+
+</InlineCompilerError>
+
+<!--
+The handler lambda is a `suspend` lambda; a plain function is not. Moving
+the body out of the lambda loses that, and the first `respond` tells you.
+-->
+
+---
+magic-move
+---
+
 # Handlers are extensions of `RoutingContext`
 
 <DrawnAnnotation text="RoutingContext" label="Where `call` comes from: the receiver of every handler" :geometry="{ label: { x: 0.72, y: 0.53, width: 0.42 } }" />
 <DrawnAnnotation text="suspend" label="Handlers suspend, and so does anything that responds" :geometry="{ label: { x: 0.74, y: 0.62, width: 0.4 } }" />
+
+<TypeHint :line="3" receiver="Routing">
+<TypeHint :line="4" receiver="RoutingContext">
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -310,6 +358,9 @@ suspend fun RoutingContext.hello(req: Greeting.Hello) {
   call.respondText("Hello, ${req.parent.name}, it's ${req.hour} o'clock")
 }
 ```
+
+</TypeHint>
+</TypeHint>
 
 <!--
 The other way to split: keep the routes together and move the code inside
@@ -388,6 +439,8 @@ keeps the page in Kotlin.
 
 <DrawnAnnotation text="respondHtml" label="`ktor-server-html-builder`: `Content-Type: text/html`, status `200`" :geometry="{ label: { x: 0.66, y: 0.243, width: 0.42 } }" />
 
+<TypeHint :line="2" receiver="HTML">
+
 ```kotlin
 import io.ktor.server.html.respondHtml
 import io.ktor.server.routing.RoutingContext
@@ -404,6 +457,8 @@ suspend fun RoutingContext.hello(req: Greeting.Hello) {
   }
 }
 ```
+
+</TypeHint>
 
 <!--
 `kotlinx.html` is a library from JetBrains that describes HTML documents as
@@ -417,9 +472,10 @@ magic-move
 
 # HTML is a Kotlin DSL
 
-<DrawnAnnotation text="head {" :geometry="{ label: { x: 0.6, y: 0.29, width: 0.3 } }" />
-<DrawnAnnotation text="body {" />
 <DrawnAnnotation text="h1 {" label="Nesting is nesting: a block per tag" :geometry="{ label: { x: 0.78, y: 0.48, width: 0.32 } }" />
+
+<TypeHint :line="3" receiver="HEAD">
+<TypeHint :line="6" receiver="BODY">
 
 ```kotlin
 import io.ktor.server.html.respondHtml
@@ -437,6 +493,9 @@ suspend fun RoutingContext.hello(req: Greeting.Hello) {
   }
 }
 ```
+
+</TypeHint>
+</TypeHint>
 
 ---
 magic-move

@@ -1,0 +1,11 @@
+# Shared by every exercise module: the serialization compiler plug-in and the
+# same experimental flags the deck's build.gradle.kts enables.
+dependencies:
+  - org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0
+
+settings:
+  kotlin:
+    serialization: json
+    freeCompilerArgs:
+      - "-Xcontext-parameters"
+      - "-Xcollection-literals"

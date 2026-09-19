@@ -9,16 +9,13 @@ import io.ktor.client.plugins.resources.get
 import io.ktor.server.response.respond
 import io.ktor.server.routing.RoutingContext
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 
 suspend fun RoutingContext.github(user: String) = coroutineScope {
   client().use { client ->
     val resource = GitHub.User(user)
-    val (info, repos) = awaitAll(
-      async { client.get(resource) },
-      async { client.get(GitHub.User.Repos(resource)) },
-    )
+    val info = async { client.get(resource) }.await()
+    val repos = async { client.get(GitHub.User.Repos(resource)) }.await()
     call.respond(Profile(info.body<User>(), repos.body<List<Repo>>()))
   }
 }

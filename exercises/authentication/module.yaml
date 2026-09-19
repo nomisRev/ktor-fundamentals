@@ -1,0 +1,17 @@
+product: jvm/lib
+
+apply:
+  - ../common.module-template.yaml
+
+dependencies:
+  - io.ktor:ktor-server-core:3.5.2
+  - io.ktor:ktor-server-resources:3.5.2
+  - io.ktor:ktor-server-sessions:3.5.2
+  - io.ktor:ktor-server-auth:3.5.2
+  - io.ktor:ktor-server-auth-jwt:3.5.2
+  - io.ktor:ktor-server-content-negotiation:3.5.2
+  - io.ktor:ktor-serialization-kotlinx-json:3.5.2
+  - com.auth0:java-jwt:4.6.0
+
+test-dependencies:
+  - io.ktor:ktor-server-test-host:3.5.2

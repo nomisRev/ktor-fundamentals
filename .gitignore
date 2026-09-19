@@ -10,3 +10,8 @@ slides-export/
 .gradle/
 build/
 .slidev
+.kotlin/
+.claude/worktrees/
+exercises/.idea/
+exercises/build/
+exercises/.kotlin/

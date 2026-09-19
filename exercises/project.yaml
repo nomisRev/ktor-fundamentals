@@ -1,0 +1,14 @@
+# One module per lesson (listed alphabetically here, in deck order in the
+# README). A module's tests only compile once every declaration the lesson
+# asks for exists, so keeping the lessons apart means an unfinished lesson
+# never blocks the tests of another.
+modules:
+  - ./authentication
+  - ./configuration
+  - ./first-server
+  - ./http-client
+  - ./requests-and-responses
+  - ./sessions-and-static
+  - ./status-pages-and-testing
+  - ./type-safe-routing
+  - ./websockets-and-openapi

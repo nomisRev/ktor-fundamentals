@@ -7,10 +7,8 @@ import presentation.support.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.server.application.Application
-import io.ktor.server.response.respond
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
-import java.util.Date
 
 fun Application.routes() {
   routing {
@@ -18,9 +16,7 @@ fun Application.routes() {
       if (loggedIn) {
         val token = JWT.create()
           .withClaim("username", name)
-          .withExpiresAt(Date(System.currentTimeMillis() + 60_000))
           .sign(Algorithm.HMAC256(secret))
-        call.respond(mapOf("token" to token))
       }
     }
   }

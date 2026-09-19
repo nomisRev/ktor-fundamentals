@@ -1,0 +1,11 @@
+product: jvm/lib
+
+apply:
+  - ../common.module-template.yaml
+
+dependencies:
+  - io.ktor:ktor-server-core:3.5.2
+  - io.ktor:ktor-server-netty:3.5.2
+
+test-dependencies:
+  - io.ktor:ktor-server-test-host:3.5.2

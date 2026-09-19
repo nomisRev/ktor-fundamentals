@@ -481,6 +481,8 @@ several.
 <DrawnAnnotation text="github: GitHubService" label="A fake in tests, `GitHubHttp` in `module()`: the handler cannot tell" :geometry="{ label: { x: 0.8, y: 0.28, width: 0.28 } }" />
 <DrawnAnnotation text="async { github.getUserInfo(user) }" label="Still concurrent: the interface suspends, so `async` still applies" :geometry="{ label: { x: 0.8, y: 0.4, width: 0.28 } }" />
 
+<SmartCast :line="7" text="found">
+
 ```kotlin
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
@@ -498,6 +500,8 @@ suspend fun RoutingContext.github(github: GitHubService, user: String) =
     }
   }
 ```
+
+</SmartCast>
 
 <!--
 Nothing in this function imports `io.ktor.client`. The test for it is a

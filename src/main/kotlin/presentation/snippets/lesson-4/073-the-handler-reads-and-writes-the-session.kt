@@ -6,7 +6,6 @@ package presentation.snippets.lesson4.slide73
 import presentation.support.*
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.RoutingContext
-import io.ktor.server.sessions.clear
 import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
@@ -23,9 +22,4 @@ suspend fun RoutingContext.hello(req: Greeting.Hello) {
   } else {
     call.respondText("Hello, ${req.parent.name}")
   }
-}
-
-suspend fun RoutingContext.bye(req: Greeting.Bye) {
-  call.sessions.clear<GreetingTracker>()
-  call.respondText("Bye, ${req.parent.name}")
 }

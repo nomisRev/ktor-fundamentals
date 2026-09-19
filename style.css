@@ -1,25 +1,108 @@
+/* Bundle the presentation fonts: the deck is published on GitHub Pages, so a
+   viewer's machine cannot be expected to have JetBrains Sans installed. The
+   headmatter's `fonts.provider: none` keeps Slidev from loading the Google
+   fallbacks on top of these faces. */
+@font-face {
+  font-family: 'JetBrains Sans';
+  src: url('/fonts/JetBrainsSans-VF.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Thin.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 100;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-ExtraLight.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 200;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Light.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Regular.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Medium.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-SemiBold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Bold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-ExtraBold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
 /* Deck refinements on top of slidev-theme-kotlin, shared with the reference deck. */
 :root {
+  --slidev-font-sans: 'JetBrains Sans', ui-sans-serif, system-ui, sans-serif;
+  --slidev-font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --fundamentals-purple: #7954f6;
   --fundamentals-pink: #eb55e6;
   --fundamentals-ink: #1f2023;
+
+  /* Default colour for DrawnAnnotation strokes and labels. Keep the hard
+     fallback: a token that resolves invalid makes the strokes vanish instead
+     of falling back to the text colour. */
   --drawn-annotation-color: var(--fundamentals-purple, #7954f6);
-  --code-window-columns: 80;
 }
 
 html.dark {
   --fundamentals-ink: #f4f2f7;
 }
 
+/* Timing scale: 300ms for click reveals, 500ms for code/page/Kodee motion.
+   Keeping these values close means a click does not finish far before the
+   content it introduces has arrived. */
 .slidev-vclick-target:not(.slidev-vclick-anim-none) {
-  transition-duration: 280ms;
+  transition-duration: 300ms;
   transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 ::view-transition-old(root),
 ::view-transition-new(root),
 ::view-transition-group(root) {
-  animation-duration: 480ms;
+  animation-duration: 500ms;
   animation-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
@@ -33,8 +116,8 @@ html.dark {
 .slidev-layout h1 { margin-bottom: 1.25rem; font-size: 3.65rem; line-height: 1.08; letter-spacing: -0.035em; }
 .slidev-layout h2 { margin-bottom: 1rem; }
 .slidev-layout pre { margin-top: 0.8rem; margin-bottom: 0.8rem; }
-
-.card { width: fit-content; max-width: 100%; }
+.slidev-layout li + li { margin-top: 0.3rem; }
+.slidev-layout table { font-size: 1.2rem; }
 
 /* Blockquotes are used as compact slide annotations in this deck. Keep the
    content treatment unchanged; replace the card with one quiet gradient rail. */
@@ -61,27 +144,30 @@ html.dark {
   background-clip: text; -webkit-background-clip: text; color: transparent;
 }
 .fundamentals-cover h2 { font-size: 2rem; }
-.section-slide h1 { max-width: 48rem; font-size: 4.4rem !important; }
+/* The cover column is 48% of the content box by default (theme); the Ktor
+   subtitle and version line need a little more to stay on one line each. */
+.fundamentals-cover { --cover-text-width: 68%; }
+.fundamentals-cover p { line-height: 1.35; }
+.section-slide h1,
+.exercise-slide h1 { max-width: 48rem; font-size: 4.4rem !important; }
 .lesson-number { color: var(--fundamentals-purple); font-size: 1.2rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; }
 .kodee-character { z-index: 0; }
 .slidev-layout > :not(.kodee-character) { position: relative; z-index: 1; }
 
-/* Intro */
-.deck-baseline { margin-top: 2.25rem; color: #665f71; font-size: 1.2rem; font-weight: 650; letter-spacing: 0.04em; }
-
-/* A semantic, theme-friendly numbered list. Markdown lists on the agenda
-   receive the same treatment without requiring handwritten HTML classes. */
-:is(.numbered-list, .agenda-slide ol) {
+/* Agenda: a numbered rail whose markers run from purple to pink. */
+.agenda-slide ol {
   --numbered-list-rule: rgb(121 84 246 / 22%);
   counter-reset: numbered-list-item;
   position: relative;
   display: grid;
   gap: 0;
+  max-width: 48rem;
   margin: 1.55rem 0 1.5rem;
   padding: 0;
   list-style: none;
 }
-:is(.numbered-list, .agenda-slide ol) > li {
+
+.agenda-slide ol > li {
   counter-increment: numbered-list-item;
   position: relative;
   z-index: 1;
@@ -97,7 +183,8 @@ html.dark {
   font-weight: 680;
   letter-spacing: -0.012em;
 }
-:is(.numbered-list, .agenda-slide ol) > li::before {
+
+.agenda-slide ol > li::before {
   align-self: center;
   content: counter(numbered-list-item, decimal-leading-zero);
   font-family: var(--slidev-font-mono);
@@ -109,14 +196,9 @@ html.dark {
   color: var(--numbered-list-marker, var(--fundamentals-purple));
 }
 
-/* `sibling-index()` and `sibling-count()` make the first marker purple and
-   the last pink, regardless of how many items a list contains. The fallback
-   above keeps markers legible in browsers that do not support these functions. */
 @supports (color: color-mix(in oklch, red calc(sibling-index() * 1%), blue)) {
-  :is(.numbered-list, .agenda-slide ol) > li::before {
-    --numbered-list-progress: calc(
-      (sibling-index() - 1) / max(1, sibling-count() - 1)
-    );
+  .agenda-slide ol > li::before {
+    --numbered-list-progress: calc((sibling-index() - 1) / max(1, sibling-count() - 1));
     --numbered-list-marker: color-mix(
       in oklch,
       #7954f6 calc((1 - var(--numbered-list-progress)) * 100%),
@@ -125,11 +207,9 @@ html.dark {
   }
 }
 
-:is(.agenda-list, .agenda-slide ol) { max-width: 48rem; }
-.agenda-footnote { margin-top: 1.55rem; color: #665f71; font-size: 1.2rem; }
-.section-lede { margin-top: -0.25rem; color: #665f71; font-size: 1.65rem; font-weight: 600; }
-
-html.dark :is(.numbered-list, .agenda-slide ol) { --numbered-list-rule: rgb(121 84 246 / 34%); }
+html.dark .agenda-slide ol {
+  --numbered-list-rule: rgb(121 84 246 / 34%);
+}
 
 /* Closing: one calm, generous moment after the denser technical material. */
 .slidev-layout.closing-slide {
@@ -172,14 +252,20 @@ html.dark :is(.numbered-list, .agenda-slide ol) { --numbered-list-rule: rgb(121 
   gap: 0.8rem;
   margin-bottom: 1.45rem;
 }
-.closing-mark span {
+.closing-mark > span:first-child {
   display: block;
   width: 3.7rem;
   height: 0.2rem;
   border-radius: 1rem;
   background: linear-gradient(90deg, var(--fundamentals-purple), var(--fundamentals-pink));
 }
-.closing-mark img { width: 2.55rem; height: 2.55rem; object-fit: contain; }
+.closing-logo {
+  display: block;
+  width: 2.55rem;
+  height: 2.55rem;
+  background: center / contain no-repeat url('/ktor.svg');
+}
+html.dark .closing-logo { background-image: url('/ktor_dark.svg'); }
 .closing-eyebrow {
   margin: 0 0 0.55rem;
   color: var(--fundamentals-purple);
@@ -226,140 +312,12 @@ html.dark .closing-slide::after { background: radial-gradient(circle, rgb(235 85
 }
 
 
-.exercise-slide h1 {
-  max-width: 48rem;
-  font-size: 4.4rem !important;
-}
-
 .exercise-slide ul {
   max-width: 52rem;
   font-size: 1.6rem;
   font-weight: 600;
 }
 
-/* Runtime failure. Deliberately unboxed: this is IDE console output, not a
-   code sample. */
-.stacktrace {
-  margin: 1.15rem 0 0;
-  color: #8b0000;
-  font-family: var(--slidev-font-mono);
-  font-size: 1.6rem;
-  font-weight: 500;
-  line-height: 1.63;
-  letter-spacing: -0.025em;
-  white-space: nowrap;
-}
-
-.stacktrace-link {
-  color: #767982;
-  text-decoration: underline;
-  text-decoration-thickness: 0.06em;
-  text-underline-offset: 0.1em;
-}
-
-html.dark .stacktrace { color: #ff8f8f; }
-html.dark .stacktrace-link { color: #b9bbc2; }
-
-/* Closing: one calm, generous moment after the denser technical material. */
-.slidev-layout.closing-slide {
-  position: relative;
-  isolation: isolate;
-  padding: 0;
-  overflow: hidden;
-}
-.closing-slide::before,
-.closing-slide::after {
-  position: absolute;
-  z-index: -1;
-  border-radius: 999px;
-  content: '';
-  pointer-events: none;
-}
-.closing-slide::before {
-  top: -21rem;
-  right: -14rem;
-  width: 43rem;
-  height: 43rem;
-  background: radial-gradient(circle, rgb(121 84 246 / 15%) 0%, rgb(121 84 246 / 5%) 42%, transparent 70%);
-}
-.closing-slide::after {
-  bottom: -26rem;
-  left: 11%;
-  width: 46rem;
-  height: 46rem;
-  background: radial-gradient(circle, rgb(235 85 230 / 11%) 0%, transparent 69%);
-}
-.closing-content {
-  width: min(100% - 12rem, 64rem);
-  margin: auto;
-  text-align: center;
-}
-.closing-mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.8rem;
-  margin-bottom: 1.45rem;
-}
-.closing-mark span {
-  display: block;
-  width: 3.7rem;
-  height: 0.2rem;
-  border-radius: 1rem;
-  background: linear-gradient(90deg, var(--fundamentals-purple), var(--fundamentals-pink));
-}
-.closing-mark img { width: 2.55rem; height: 2.55rem; object-fit: contain; }
-.closing-eyebrow {
-  margin: 0 0 0.55rem;
-  color: var(--fundamentals-purple);
-  font-family: var(--slidev-font-mono);
-  font-size: 1rem;
-  font-weight: 800;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-}
-.closing-slide h1 {
-  margin: 0;
-  color: var(--fundamentals-ink);
-  font-size: 5.55rem !important;
-  font-weight: 750;
-  letter-spacing: -0.065em;
-  line-height: 0.96;
-}
-.closing-slide h1 span {
-  background: linear-gradient(100deg, var(--fundamentals-purple), var(--fundamentals-pink));
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-}
-.closing-rule {
-  width: 6.7rem;
-  height: 0.24rem;
-  margin: 2.1rem auto 1.65rem;
-  border-radius: 1rem;
-  background: linear-gradient(90deg, var(--fundamentals-purple), var(--fundamentals-pink));
-}
-.closing-question {
-  margin: 0;
-  color: var(--fundamentals-ink);
-  font-size: 2.15rem;
-  font-weight: 680;
-  letter-spacing: -0.03em;
-}
-.closing-question span { color: var(--fundamentals-pink); }
-html.dark .closing-slide::before { background: radial-gradient(circle, rgb(121 84 246 / 24%) 0%, rgb(121 84 246 / 7%) 42%, transparent 70%); }
-html.dark .closing-slide::after { background: radial-gradient(circle, rgb(235 85 230 / 18%) 0%, transparent 69%); }
-
-@media (prefers-reduced-motion: reduce) {
-  .slidev-vclick-target,
-  ::view-transition-old(root),
-  ::view-transition-new(root),
-  ::view-transition-group(root) {
-    transition-duration: 1ms !important;
-    transition-delay: 0ms !important;
-    animation-duration: 1ms !important;
-  }
-}
 
 @media print {
   .slidev-layout {

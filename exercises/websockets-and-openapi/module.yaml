@@ -1,0 +1,18 @@
+product: jvm/lib
+
+apply:
+  - ../common.module-template.yaml
+
+dependencies:
+  - io.ktor:ktor-server-core:3.5.2
+  - io.ktor:ktor-server-content-negotiation:3.5.2
+  - io.ktor:ktor-serialization-kotlinx-json:3.5.2
+  - io.ktor:ktor-server-websockets:3.5.2
+  - io.ktor:ktor-server-routing-openapi:3.5.2
+  - io.ktor:ktor-server-swagger:3.5.2
+  - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0
+
+test-dependencies:
+  - io.ktor:ktor-server-test-host:3.5.2
+  # The client WebSockets plug-in ships inside ktor-client-core since 3.x.
+  - io.ktor:ktor-client-core:3.5.2

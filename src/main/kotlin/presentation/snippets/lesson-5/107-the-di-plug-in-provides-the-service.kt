@@ -6,19 +6,14 @@ package presentation.snippets.lesson5.slide107
 import presentation.support.*
 import io.ktor.server.application.Application
 import io.ktor.server.plugins.di.dependencies
-import io.ktor.server.plugins.di.resolve
 import io.ktor.server.resources.get
 import io.ktor.server.routing.routing
 
-suspend fun Application.module() {
+fun Application.module() {
   dependencies {
     provide<GitHubService> { GitHubHttp(client()) }
   }
-  routes()
-}
-
-suspend fun Application.routes() {
-  val github: GitHubService = dependencies.resolve()
+  val github: GitHubService by dependencies
   routing {
     get<GitHubProfile> { req -> github(github, req.username) }
   }
