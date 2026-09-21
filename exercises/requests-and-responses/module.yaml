@@ -4,9 +4,9 @@ apply:
   - ../common.module-template.yaml
 
 dependencies:
-  - io.ktor:ktor-server-core:3.5.2
-  - io.ktor:ktor-server-content-negotiation:3.5.2
-  - io.ktor:ktor-serialization-kotlinx-json:3.5.2
+  - io.ktor:ktor-server-core:3.6.0
+  - io.ktor:ktor-server-content-negotiation:3.6.0
+  - io.ktor:ktor-serialization-kotlinx-json:3.6.0
 
 test-dependencies:
-  - io.ktor:ktor-server-test-host:3.5.2
+  - io.ktor:ktor-server-test-host:3.6.0

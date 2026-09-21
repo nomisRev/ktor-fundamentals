@@ -3,7 +3,7 @@
 - In doubt read code in node_modules to understand the libraries you need to work with
 - slidev-theme-kotlin can be found in ../slidedev-theme-kotlin
 - Write slides in Simon's voice: load the `kotlin-slides-voice` skill before touching lessons/*.md
-- Find Ktor documentation here: https://ktor.io/docs/ (the deck targets Ktor 3.5.2)
+- Find Ktor documentation here: https://ktor.io/docs/ (the deck targets Ktor 3.6.0)
 - Use `slidev --help` and your extensions read-slide. A server should be running on port 3030.
 - After changing a Kotlin fence run `npm run snippets && ./gradlew build`; mark a fence that is deliberately partial with `no-compile`
 - Ktor sources are checked out at ~/Developer/ktor and the docs at ~/Developer/ktor-documentation (`topics/`, `codeSnippets/snippets/`); grep them to verify an API

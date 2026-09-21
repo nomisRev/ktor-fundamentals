@@ -7,7 +7,7 @@ plugins {
   id("org.jetbrains.kotlin.plugin.serialization") version "2.4.20"
 }
 
-val ktorVersion = "3.5.2"
+val ktorVersion = "3.6.0"
 
 repositories {
   mavenCentral()
@@ -31,6 +31,7 @@ dependencies {
   implementation("io.ktor:ktor-server-auth:$ktorVersion")
   implementation("io.ktor:ktor-server-auth-jwt:$ktorVersion")
   implementation("io.ktor:ktor-server-auth-ldap:$ktorVersion")
+  implementation("io.ktor:ktor-server-auth-oidc:$ktorVersion")
   implementation("io.ktor:ktor-server-websockets:$ktorVersion")
   implementation("io.ktor:ktor-server-metrics-micrometer:$ktorVersion")
   implementation("io.ktor:ktor-server-config-yaml:$ktorVersion")
@@ -64,7 +65,12 @@ dependencies {
 
 kotlin {
   jvmToolchain(21)
-  compilerOptions.freeCompilerArgs.addAll("-Xcontext-parameters", "-Xcollection-literals")
+  compilerOptions.freeCompilerArgs.addAll(
+    "-Xcontext-parameters",
+    "-Xcollection-literals",
+    // The typed authentication API and the OIDC plug-in are experimental in Ktor 3.6.0.
+    "-opt-in=io.ktor.utils.io.ExperimentalKtorApi",
+  )
 }
 
 val snippetsCheck by tasks.register<Exec>("snippetsCheck") {

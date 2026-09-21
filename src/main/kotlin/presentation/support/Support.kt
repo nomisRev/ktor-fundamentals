@@ -22,8 +22,17 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.install
+import io.ktor.server.auth.AuthenticationRole
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.UserPasswordCredential
+import io.ktor.server.auth.basic
+import io.ktor.server.auth.form
+import io.ktor.server.auth.jwt.jwt
+import io.ktor.server.auth.oidc.OidcProvider
+import io.ktor.server.auth.session
+import io.ktor.server.auth.withRoles
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.RoutingContext
@@ -175,10 +184,46 @@ val users: Set<String> = setOf("Alex")
 @Serializable
 data class UserInfo(val name: String, val timezone: String)
 
-/** The validation function the providers share: a principal, or `null`. */
+/** The validation function the schemes share: a principal, or `null`. */
 fun checkCredentials(credentials: UserPasswordCredential): UserIdPrincipal? =
   if (credentials.password == "supersecret") UserIdPrincipal(credentials.name)
   else null
+
+// The schemes the route slides pass to `authenticateWith` without repeating
+// their definition. The slide that defines one shadows this copy.
+val basicAuth = basic<UserIdPrincipal>("auth") {
+  realm = "Access to secrets"
+  validate { checkCredentials(it) }
+}
+
+val formAuth = form<UserIdPrincipal>("auth-form") {
+  usernameField = "username"
+  passwordField = "password"
+  validate { checkCredentials(it) }
+}
+
+val sessionAuth = session<UserInfo, UserIdPrincipal>("auth-session") {
+  validate { info -> if (info.name in users) UserIdPrincipal(info.name) else null }
+}
+
+val jwtAuth = jwt<UserIdPrincipal>("auth-jwt") {
+  realm = "Access to secrets"
+  verifier(JWT.require(Algorithm.HMAC256(secret)).build())
+  validate { credential ->
+    val user = credential.payload.getClaim("username").asString()
+    if (user.isNullOrEmpty()) null else UserIdPrincipal(user)
+  }
+}
+
+/** The roles the authorization slides check; an enum's `name` satisfies `AuthenticationRole`. */
+enum class Role : AuthenticationRole { User, Admin }
+
+val roleAuth = jwtAuth.withRoles { user ->
+  if (user.name == "Alex") setOf(Role.User, Role.Admin) else setOf(Role.User)
+}
+
+/** The OpenID Connect provider the route slides protect with; the module slides register it. */
+lateinit var google: OidcProvider
 
 // ---------------------------------------------------------------------------
 // WebSockets and OpenAPI (lesson 6)

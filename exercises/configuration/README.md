@@ -11,7 +11,7 @@ Ktor Gradle plug-in and `EngineMain` as the main class:
 ```kotlin
 plugins {
   application
-  id("io.ktor.plugin") version "3.5.2"
+  id("io.ktor.plugin") version "3.6.0"
 }
 
 application {

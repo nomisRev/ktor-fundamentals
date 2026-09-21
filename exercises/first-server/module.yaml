@@ -4,8 +4,8 @@ apply:
   - ../common.module-template.yaml
 
 dependencies:
-  - io.ktor:ktor-server-core:3.5.2
-  - io.ktor:ktor-server-netty:3.5.2
+  - io.ktor:ktor-server-core:3.6.0
+  - io.ktor:ktor-server-netty:3.6.0
 
 test-dependencies:
-  - io.ktor:ktor-server-test-host:3.5.2
+  - io.ktor:ktor-server-test-host:3.6.0

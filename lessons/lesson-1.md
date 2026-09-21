@@ -26,7 +26,7 @@ kodee: welcome
 The whole course is about HTTP, on both sides of the wire. The first lessons
 focus on the server; the client shows up in lesson 5 when we talk to other
 services. Ktor leans on Kotlin: extension functions, lambdas with receivers,
-coroutines. Every slide in this deck is Ktor 3.5.2.
+coroutines. Every slide in this deck is Ktor 3.6.0.
 -->
 
 ---

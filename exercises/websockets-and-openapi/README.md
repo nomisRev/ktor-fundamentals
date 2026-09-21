@@ -15,7 +15,7 @@ The steps that are not code:
    the Ktor Gradle plug-in turns into the document at build time:
 
    ```kotlin
-   plugins { id("io.ktor.plugin") version "3.5.2" }
+   plugins { id("io.ktor.plugin") version "3.6.0" }
    ktor { openApi { enabled = true; codeInferenceEnabled = true } }
    ```
 

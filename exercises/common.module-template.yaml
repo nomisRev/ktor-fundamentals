@@ -9,3 +9,5 @@ settings:
     freeCompilerArgs:
       - "-Xcontext-parameters"
       - "-Xcollection-literals"
+      # The typed authentication API is experimental in Ktor 3.6.0.
+      - "-opt-in=io.ktor.utils.io.ExperimentalKtorApi"

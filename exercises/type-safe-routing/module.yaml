@@ -4,11 +4,11 @@ apply:
   - ../common.module-template.yaml
 
 dependencies:
-  - io.ktor:ktor-server-core:3.5.2
-  - io.ktor:ktor-server-resources:3.5.2
-  - io.ktor:ktor-server-html-builder:3.5.2
+  - io.ktor:ktor-server-core:3.6.0
+  - io.ktor:ktor-server-resources:3.6.0
+  - io.ktor:ktor-server-html-builder:3.6.0
   - org.jetbrains.kotlinx:kotlinx-html:0.12.0
 
 test-dependencies:
-  - io.ktor:ktor-server-test-host:3.5.2
-  - io.ktor:ktor-client-resources:3.5.2
+  - io.ktor:ktor-server-test-host:3.6.0
+  - io.ktor:ktor-client-resources:3.6.0

@@ -2,7 +2,7 @@
 
 The steps of the exercise slide that are not code:
 
-1. Generate a project at [start.ktor.io](https://start.ktor.io) (Ktor 3.5.2,
+1. Generate a project at [start.ktor.io](https://start.ktor.io) (Ktor 3.6.0,
    Gradle Kotlin DSL, engine Netty, no plug-ins yet) and open it in IntelliJ
    IDEA.
 2. Run it with `./gradlew run` and open `http://0.0.0.0:8080` in the browser.

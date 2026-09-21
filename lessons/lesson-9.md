@@ -561,7 +561,7 @@ Kotlin/Native builds CIO servers too.
 
 # The Ktor Gradle plug-in packages the server
 
-<DrawnAnnotation text="id(&quot;io.ktor.plugin&quot;) version &quot;3.5.2&quot;" label="Fat JAR, Docker image, OpenAPI: one plug-in for the whole life cycle" :geometry="{ label: { x: 0.72, y: 0.383, width: 0.42 } }" />
+<DrawnAnnotation text="id(&quot;io.ktor.plugin&quot;) version &quot;3.6.0&quot;" label="Fat JAR, Docker image, OpenAPI: one plug-in for the whole life cycle" :geometry="{ label: { x: 0.72, y: 0.383, width: 0.42 } }" />
 <DrawnAnnotation text="&quot;com.example.ApplicationKt&quot;" label="The file holding `main`: `Application.kt` compiles to `ApplicationKt`" :geometry="{ label: { x: 0.74, y: 0.571, width: 0.42 } }" />
 
 ```kotlin gradle no-compile
@@ -569,7 +569,7 @@ plugins {
   kotlin("jvm") version "2.4.20"
   kotlin("plugin.serialization") version "2.4.20"
   application
-  id("io.ktor.plugin") version "3.5.2"
+  id("io.ktor.plugin") version "3.6.0"
 }
 
 application {
@@ -692,7 +692,7 @@ plugins {
 }
 
 dependencies {
-  implementation("io.ktor:ktor-server-servlet-jakarta:3.5.2")
+  implementation("io.ktor:ktor-server-servlet-jakarta:3.6.0")
 }
 ```
 

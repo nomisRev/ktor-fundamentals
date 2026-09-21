@@ -34,7 +34,7 @@ kodee: welcome
 
 ## From first route to production HTTP services
 
-Ktor 3.5.2 · Kotlin 2.4.20 · kotlinx.serialization 1.11.0
+Ktor 3.6.0 · Kotlin 2.4.20 · kotlinx.serialization 1.11.0
 
 ---
 layout: intro

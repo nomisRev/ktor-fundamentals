@@ -13,6 +13,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.setCookie
+import io.ktor.server.auth.oidc.OpenIdTestKeys
 import io.ktor.server.auth.UserPasswordCredential
 import io.ktor.server.config.MapApplicationConfig
 import io.ktor.server.testing.testApplication
@@ -59,7 +60,7 @@ class AuthenticationTest {
     application { sessionModule() }
     val response = client.post("/login?timezone=CET") { basicAuth("ada", "supersecret") }
     assertEquals(HttpStatusCode.NoContent, response.status)
-    assertNotNull(response.setCookie().singleOrNull { it.name == "user" }, "no `user` cookie was set")
+    assertNotNull(response.setCookie().singleOrNull { it.name == "auth-session" }, "no `auth-session` cookie was set")
     assertEquals(HttpStatusCode.Unauthorized, client.post("/login").status)
   }
 
@@ -108,6 +109,19 @@ class AuthenticationTest {
   }
 
   @Test
+  fun `admins are greeted, users are forbidden`() = testApplication {
+    application { adminModule("test-secret") }
+    val admin = client.post("/login") { basicAuth("ada", "supersecret") }.token()
+    val response = client.get("/greet/ada/hello/9") { bearerAuth(admin) }
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals("Hello, ada", response.bodyAsText())
+
+    val user = client.post("/login") { basicAuth("linus", "supersecret") }.token()
+    assertEquals(HttpStatusCode.Forbidden, client.get("/greet/ada/hello/9") { bearerAuth(user) }.status)
+    assertEquals(HttpStatusCode.Unauthorized, client.get("/greet/ada/hello/9").status)
+  }
+
+  @Test
   fun `the secret comes from configuration`() = testApplication {
     environment {
       config = MapApplicationConfig("jwt.secret" to "from-config")
@@ -118,5 +132,21 @@ class AuthenticationTest {
     assertFailsWith<JWTVerificationException> {
       JWT.require(Algorithm.HMAC256("supersecret")).build().verify(token)
     }
+  }
+
+  @Test
+  fun `the provider's tokens open the greeting`() = testApplication {
+    val issuer = "https://issuer.test"
+    val keys = OpenIdTestKeys.rsa(issuer = issuer, audience = "greetings-api")
+    application { oidcModule(issuer, keys) }
+
+    val token = keys.accessToken { subject = "ada" }
+    val response = client.get("/greet/ada/hello/9") { bearerAuth(token) }
+    assertEquals(HttpStatusCode.OK, response.status)
+    assertEquals("Hello, ada", response.bodyAsText())
+
+    val otherApi = keys.accessToken { subject = "ada"; audience = "other-api" }
+    assertEquals(HttpStatusCode.Unauthorized, client.get("/greet/ada/hello/9") { bearerAuth(otherApi) }.status)
+    assertEquals(HttpStatusCode.Unauthorized, client.get("/greet/ada/hello/9").status)
   }
 }

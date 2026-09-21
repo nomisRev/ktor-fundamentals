@@ -328,13 +328,13 @@ in that order of precedence.
 
 # The compiler extension reads your routes
 
-<DrawnAnnotation text="id(&quot;io.ktor.plugin&quot;) version &quot;3.5.2&quot;" label="The Gradle plug-in from lesson 1 ships the compiler extension" :geometry="{ label: { x: 0.76, y: 0.242, width: 0.36 } }" />
+<DrawnAnnotation text="id(&quot;io.ktor.plugin&quot;) version &quot;3.6.0&quot;" label="The Gradle plug-in from lesson 1 ships the compiler extension" :geometry="{ label: { x: 0.76, y: 0.242, width: 0.36 } }" />
 <DrawnAnnotation text="codeInferenceEnabled = true" label="Reads `call.parameters`, `call.receive<T>()`, `call.respond(…)` inside handlers" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
 <DrawnAnnotation text="onlyCommented = false" label="Every route is in the document; `true` keeps only the commented ones" :geometry="{ label: { x: 0.74, y: 0.62, width: 0.4 } }" />
 
 ```kotlin gradle no-compile
 plugins {
-  id("io.ktor.plugin") version "3.5.2"
+  id("io.ktor.plugin") version "3.6.0"
 }
 
 ktor {

@@ -1,11 +1,17 @@
-# Protect the greetings three ways
+# Protect the greetings four ways
 
-Three modules for three transports, one validation function:
-`src/auth/Basic.kt` (`checkCredentials` and `basicModule`),
-`src/auth/Session.kt` (`login` and `sessionModule`) and `src/auth/Jwt.kt`
-(`jwtModule(secret)` and the `jwtModule()` that reads the secret from
-`environment.config`). Check them with
-`./kotlin test --include-module authentication` from `exercises/`.
+Four files for four schemes, one validation function:
+`src/auth/Basic.kt` (`checkCredentials`, `basicAuth` and `basicModule`),
+`src/auth/Session.kt` (`login`, `sessionAuth` and `sessionModule`),
+`src/auth/Jwt.kt` (`jwtAuth(secret)`, `jwtModule(secret)`, `adminModule(secret)`
+and the `jwtModule()` that reads the secret from `environment.config`) and
+`src/auth/Oidc.kt` (`oidcModule`, against an in-memory OpenID Connect
+provider). Check them with `./kotlin test --include-module authentication`
+from `exercises/`.
+
+The typed authentication API and the `Oidc` plug-in are experimental in
+Ktor 3.6.0; `common.module-template.yaml` opts in with
+`-opt-in=io.ktor.utils.io.ExperimentalKtorApi`.
 
 To try a module by hand, start it from the project of lesson 1 with
 `embeddedServer(Netty, port = 8080) { jwtModule("supersecret") }` and, in an

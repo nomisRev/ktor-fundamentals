@@ -1,7 +1,7 @@
 # Ktor Fundamentals
 
 Slidev deck built on [`slidev-theme-kotlin`](https://www.npmjs.com/package/slidev-theme-kotlin).
-Nine lessons from a first `embeddedServer` to configuration and deployment, on Ktor 3.5.2.
+Nine lessons from a first `embeddedServer` to configuration and deployment, on Ktor 3.6.0.
 
 ## Run locally
 
@@ -49,7 +49,7 @@ Kotlin file per Kotlin fence in `lessons/*.md` under
 `src/main/kotlin/presentation/snippets/`, with the fence's own imports plus
 `presentation.support.*`, the hand-written package holding the resources,
 DTOs and services the slides use without defining them. The generated files
-are committed and compile against the same Kotlin 2.4 / Ktor 3.5.2 API the
+are committed and compile against the same Kotlin 2.4 / Ktor 3.6.0 API the
 deck advertises.
 
 After changing a Kotlin fence:
