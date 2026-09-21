@@ -6,13 +6,11 @@ package presentation.snippets.lesson4.slide81
 import presentation.support.*
 import io.ktor.server.application.Application
 import io.ktor.server.http.content.staticFiles
-import io.ktor.server.http.content.staticResources
 import io.ktor.server.routing.routing
 import java.io.File
 
 fun Application.module() {
   routing {
-    staticFiles("/uploads", File("uploads"))
-    staticResources("/assets", "static")
+    staticFiles("/assets", File("files"))
   }
 }

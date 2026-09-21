@@ -1,11 +1,22 @@
 <script setup>
+import { computed } from 'vue'
+
+const props = defineProps({
+  /** Name of the plug-in drawn next to the handler on both rows; empty keeps the anonymous `Plug-in` cards. */
+  plugin: { type: String, default: '' },
+})
+
+/** Splits a camel-case plug-in name into the words a card may wrap between. */
+const pluginWords = computed(() => props.plugin.split(/(?=[A-Z])/))
 </script>
 
 <template>
   <div
     class="ktor-pipeline"
     role="img"
-    aria-label="A request enters Routing, passes through the installed plug-ins and reaches the handler; the response leaves the handler and passes back through the plug-ins."
+    :aria-label="plugin
+      ? `A request enters Routing, passes through the installed plug-ins, the last of them ${plugin}, and reaches the handler; the response leaves the handler and passes back through ${plugin} and the other plug-ins.`
+      : 'A request enters Routing, passes through the installed plug-ins and reaches the handler; the response leaves the handler and passes back through the plug-ins.'"
   >
     <!-- Request row: left to right -->
     <div class="pipeline-card pipeline-card--message">request</div>
@@ -16,7 +27,8 @@
     <div class="pipeline-arrow pipeline-arrow--right" aria-hidden="true"><i></i><svg viewBox="0 0 12 20"><path d="M2 2 L10 10 L2 18" /></svg></div>
     <div class="pipeline-card pipeline-card--more">…</div>
     <div class="pipeline-arrow pipeline-arrow--right" aria-hidden="true"><i></i><svg viewBox="0 0 12 20"><path d="M2 2 L10 10 L2 18" /></svg></div>
-    <div class="pipeline-card pipeline-card--plugin">Plug-in</div>
+    <div v-if="plugin" class="pipeline-card pipeline-card--plugin pipeline-card--named"><span><template v-for="(word, index) in pluginWords" :key="index"><wbr v-if="index > 0">{{ word }}</template></span></div>
+    <div v-else class="pipeline-card pipeline-card--plugin">Plug-in</div>
     <div class="pipeline-arrow pipeline-arrow--right" aria-hidden="true"><i></i><svg viewBox="0 0 12 20"><path d="M2 2 L10 10 L2 18" /></svg></div>
     <div class="pipeline-card pipeline-card--handler">handler</div>
 
@@ -30,7 +42,8 @@
     <div class="pipeline-arrow pipeline-arrow--left" aria-hidden="true"><svg viewBox="0 0 12 20"><path d="M10 2 L2 10 L10 18" /></svg><i></i></div>
     <div class="pipeline-card pipeline-card--more">…</div>
     <div class="pipeline-arrow pipeline-arrow--left" aria-hidden="true"><svg viewBox="0 0 12 20"><path d="M10 2 L2 10 L10 18" /></svg><i></i></div>
-    <div class="pipeline-card pipeline-card--plugin">Plug-in</div>
+    <div v-if="plugin" class="pipeline-card pipeline-card--plugin pipeline-card--named"><span><template v-for="(word, index) in pluginWords" :key="index"><wbr v-if="index > 0">{{ word }}</template></span></div>
+    <div v-else class="pipeline-card pipeline-card--plugin">Plug-in</div>
     <div class="pipeline-arrow pipeline-arrow--left" aria-hidden="true"><svg viewBox="0 0 12 20"><path d="M10 2 L2 10 L10 18" /></svg><i></i></div>
     <div class="pipeline-card pipeline-card--handler">handler</div>
   </div>
@@ -78,6 +91,16 @@
   border-color: rgb(235 85 230 / 48%);
   background: linear-gradient(135deg, rgb(235 85 230 / 11%), var(--pipeline-surface));
   color: #b731ae;
+}
+.pipeline-card--named {
+  border-color: var(--pipeline-purple);
+  background: linear-gradient(135deg, rgb(121 84 246 / 14%), var(--pipeline-surface));
+  font-family: var(--slidev-font-mono);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-align: center;
 }
 .pipeline-card--more {
   border-style: dashed;
@@ -162,6 +185,16 @@
 
 html.dark .ktor-pipeline { --pipeline-surface: rgb(35 34 42 / 92%); }
 html.dark .pipeline-card { box-shadow: 0 0.55rem 1.45rem rgb(0 0 0 / 24%); }
-html.dark .pipeline-card--more { box-shadow: none; }
+html.dark .pipeline-card--named {
+  border-color: var(--pipeline-purple);
+  background: linear-gradient(135deg, rgb(121 84 246 / 14%), var(--pipeline-surface));
+  font-family: var(--slidev-font-mono);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+.pipeline-card--more { box-shadow: none; }
 html.dark .pipeline-card--routing { color: var(--pipeline-pink); }
 </style>

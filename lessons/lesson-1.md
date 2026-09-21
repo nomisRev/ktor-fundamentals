@@ -383,6 +383,7 @@ through them on the way out.
 
 # Plug-ins are installed by name
 
+<TypeHint :line="2" receiver="ContentNegotiationConfig">
 <DrawnAnnotation text="install(ContentNegotiation)" label="(De)serialization: the handler gets data, not bytes"  :geometry="{ label: { x: 0.5062, y: 0.3058 } }"/>
 <DrawnAnnotation text="json()" label="kotlinx.serialization, a dependency of its own" color="var(--fundamentals-pink)" :geometry="{ label: { x: 0.4937, y: 0.3554 } }"/>
 
@@ -398,6 +399,49 @@ fun Application.module() {
   }
 }
 ```
+</TypeHint>
+
+---
+magic-move
+---
+
+# `ContentNegotiation` wraps the handler
+
+<KtorPipeline plugin="ContentNegotiation" />
+
+<DrawnAnnotation text="call.receive<Greeting>()" label="The plug-in before the handler: JSON body in, `Greeting` out" :geometry="{ label: { x: 0.7128, y: 0.7316, width: 0.3800 } }" />
+<DrawnAnnotation text="call.respond(greeting)" label="The plug-in after the handler: `Greeting` in, JSON body out" color="var(--fundamentals-pink)" :geometry="{ label: { x: 0.2702, y: 0.8525, width: 0.3800 } }" />
+
+```kotlin
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
+
+fun Application.module() {
+  install(ContentNegotiation) { json() }
+  routing {
+    post("/greet") {
+      val greeting = call.receive<Greeting>()
+      call.respond(greeting)
+    }
+  }
+}
+```
+
+<!--
+The picture from two slides ago, with one box named. `install` puts
+`ContentNegotiation` on both rows: on the way in it reads `Content-Type`
+and turns the JSON body into a `Greeting`, on the way out it turns the
+`Greeting` we respond with back into JSON. The handler never sees bytes.
+Strictly, the plug-in hooks into `receive` and `respond` rather than
+running before and after the handler, which is why nothing happens until
+the handler asks for the body. Lesson 2 covers `receive` and `respond`.
+-->
 
 ---
 magic-move
@@ -405,6 +449,7 @@ magic-move
 
 # Plug-ins are installed by name
 
+<TypeHint :line="2" receiver="ContentNegotiationConfig">
 <DrawnAnnotation text="install(Compression)" label="No block needed: the defaults apply"  :geometry="{ label: { x: 0.4756, y: 0.4271 } }"/>
 
 ```kotlin
@@ -422,11 +467,15 @@ fun Application.module() {
 }
 ```
 
+</TypeHint>
+
 ---
 magic-move
 ---
 
 # Plug-ins are installed by name
+
+<TypeHint :line="3" receiver="CompressionConfig">
 
 ```kotlin
 import io.ktor.serialization.kotlinx.json.json
@@ -454,6 +503,8 @@ fun Application.module() {
     excludeContentType(Audio.Any, Video.Any, Image.Any, Text.EventStream)
   }
 ```
+
+</TypeHint>
 
 ---
 

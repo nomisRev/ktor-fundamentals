@@ -6,20 +6,15 @@ package presentation.snippets.lesson2.slide34
 import presentation.support.*
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
-import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class GreetingResponse(val message: String)
 
 fun Application.module() {
   routing {
     post("/greet/{name}") {
       val name = call.parameters["name"]
-      if (name !in users) return@post call.respond(HttpStatusCode.NotFound)
-      call.respond(HttpStatusCode.Created, GreetingResponse("Hello, $name"))
+      call.respondText("Hello, $name", status = HttpStatusCode.Created)
     }
   }
 }

@@ -5,16 +5,15 @@ package presentation.snippets.lesson2.slide29
 
 import presentation.support.*
 import io.ktor.server.application.Application
-import io.ktor.server.request.receive
 import io.ktor.server.response.respondText
-import io.ktor.server.routing.post
+import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 
 fun Application.module() {
   routing {
-    post("/greet") {
-      val greeting = call.receive<Greeting>()
-      call.respondText("Hello, ${greeting.name}")
+    get("/hello/{name}") {
+      val name = call.parameters["name"]
+      call.respondText("Hello, $name")
     }
   }
 }

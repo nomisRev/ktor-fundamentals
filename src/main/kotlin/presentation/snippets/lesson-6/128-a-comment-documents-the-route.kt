@@ -12,9 +12,6 @@ import io.ktor.server.routing.get
 fun Route.greeting() {
   /**
    * Greet a person by name.
-   * Path: name [String] the person to greet
-   * Response: 400 The name is missing.
-   * Response: 200 [GreetingResponse] The greeting.
    */
   get("/greet/{name}") {
     val name = call.parameters["name"]

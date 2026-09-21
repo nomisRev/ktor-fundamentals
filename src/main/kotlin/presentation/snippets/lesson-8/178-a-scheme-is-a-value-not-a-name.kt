@@ -6,15 +6,7 @@ package presentation.snippets.lesson8.slide178
 import presentation.support.*
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.basic
-import io.ktor.server.auth.form
 
 val basicAuth = basic<UserIdPrincipal>("auth") {
   realm = "Access to secrets"
-  validate { checkCredentials(it) }
-}
-
-val formAuth = form<UserIdPrincipal>("auth-form") {
-  usernameField = "username"
-  passwordField = "password"
-  validate { checkCredentials(it) }
 }
