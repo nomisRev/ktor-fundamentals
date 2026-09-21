@@ -1,6 +1,5 @@
 package github
 
-import io.ktor.resources.Resource
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -20,13 +19,3 @@ data class Repo(
 
 @Serializable
 data class Profile(val user: User, val repos: List<Repo>)
-
-object GitHub {
-  @Serializable
-  @Resource("/users/{username}")
-  class User(val username: String) {
-    @Serializable
-    @Resource("repos")
-    class Repos(val user: User)
-  }
-}

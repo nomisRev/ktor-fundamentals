@@ -5,8 +5,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
-import io.ktor.server.application.install
-import io.ktor.server.resources.Resources
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import kotlin.test.Test
@@ -18,7 +16,6 @@ class StatusPagesTest {
   fun `an unknown path gets the 404 page`() = testApplication {
     application {
       statusPages()
-      install(Resources)
       routing { greetings() }
     }
     val response = client.get("/nowhere")
@@ -31,7 +28,6 @@ class StatusPagesTest {
   fun `your own exception gets its own page`() = testApplication {
     application {
       statusPages()
-      install(Resources)
       routing { greetings() }
     }
     val response = client.get("/greet/ada/hello/3")
@@ -46,7 +42,6 @@ class StatusPagesTest {
   fun `a greeting after six is not rewritten`() = testApplication {
     application {
       statusPages()
-      install(Resources)
       routing { greetings() }
     }
     val response = client.get("/greet/ada/hello/9")

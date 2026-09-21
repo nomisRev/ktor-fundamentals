@@ -1,6 +1,6 @@
 // Hand-written context for the generated snippets in ../snippets/.
 //
-// The slides use these resources, DTOs, services, and values without defining
+// The slides use these DTOs, services, and values without defining
 // them on every slide; each generated file star-imports this package. A snippet
 // that defines its own `Greeting` or `routes` shadows the one here, because a
 // declaration in the file's own package wins over a star import.
@@ -11,13 +11,11 @@ import io.ktor.client.call.body
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.plugins.resources.Resources
-import io.ktor.client.plugins.resources.get
+import io.ktor.client.request.get
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
 import io.ktor.http.withCharset
-import io.ktor.resources.Resource
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.createApplicationPlugin
@@ -37,7 +35,9 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.get
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import io.ktor.server.util.getValue
 import io.ktor.server.testing.testApplication
 import kotlinx.html.body
 import kotlinx.html.h1
@@ -47,27 +47,11 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 // ---------------------------------------------------------------------------
-// Type-safe routes shared across lessons
+// Requests and responses (lesson 2)
 
+/** The body of `POST /greet`; the lesson 2 slides that define it shadow this copy. */
 @Serializable
-@Resource("/greet/{name}")
-class Greeting(val name: String, val lang: String? = "en") {
-  @Serializable
-  @Resource("bye")
-  class Bye(val parent: Greeting) {
-    companion object {
-      operator fun invoke(name: String): Bye = Bye(Greeting(name))
-    }
-  }
-
-  @Serializable
-  @Resource("hello/{hour}")
-  class Hello(val parent: Greeting, val hour: Int)
-}
-
-@Serializable
-@Resource("/spell/{name}")
-class Spell(val name: String)
+data class Greeting(val name: String)
 
 // ---------------------------------------------------------------------------
 // GitHub DTOs and service (lesson 5)
@@ -101,32 +85,11 @@ interface CacheService {
 @Serializable
 data class Profile(val user: User, val repos: List<Repo>)
 
-/** The server-side route that shows a GitHub profile (lesson 5). */
-@Serializable
-@Resource("/github/{username}")
-class GitHubProfile(val username: String)
-
-/** GitHub's routes as client resources; the slides define this object once. */
-object GitHub {
-  @Serializable
-  @Resource("/users/{username}")
-  class User(val username: String) {
-    @Serializable
-    @Resource("repos")
-    class Repos(val user: User)
-  }
-
-  @Serializable
-  @Resource("/repos/{owner}/{repo}")
-  class Repo(val owner: String, val repo: String)
-}
-
 /** The client factory the lesson 5 slides build step by step. */
 fun client(): HttpClient = HttpClient(CIO) {
   install(ContentNegotiation) {
     json(Json { ignoreUnknownKeys = true })
   }
-  install(Resources)
   defaultRequest { url("https://api.github.com") }
 }
 
@@ -135,12 +98,12 @@ class GitHubHttp(
   private val client: HttpClient,
 ) : GitHubService, AutoCloseable {
   override suspend fun getUserInfo(user: String): User? =
-    client.get(GitHub.User(user))
+    client.get("/users/$user")
       .takeIf { it.status == HttpStatusCode.OK }
       ?.body<User>()
 
   override suspend fun getUserRepos(user: String): List<Repo>? =
-    client.get(GitHub.User.Repos(GitHub.User(user)))
+    client.get("/users/$user/repos")
       .takeIf { it.status == HttpStatusCode.OK }
       ?.body<List<Repo>>()
 
@@ -176,6 +139,12 @@ val secret: String = "supersecret"
 
 // Names the response examples in lesson 2 look up before answering `404`.
 val users: Set<String> = setOf("Alex")
+
+/** The login route of lesson 8 as one call, for the slides that only wrap it. */
+suspend fun RoutingContext.issueToken() {
+  val token = JWT.create().withClaim("username", name).sign(Algorithm.HMAC256(secret))
+  call.respond(mapOf("token" to token))
+}
 
 // ---------------------------------------------------------------------------
 // Authentication (lesson 8)
@@ -253,11 +222,16 @@ suspend fun RoutingContext.greet() {
 /** The application the lesson 7 tests start: the greeting routes of lesson 3. */
 fun Application.module() {
   routing {
-    get("/greet/{name}/bye") {
-      call.respondText("Bye, ${call.parameters["name"]}")
-    }
-    get("/greet/{name}/hello/{hour}") {
-      call.respondText("Hello, ${call.parameters["name"]}")
+    route("/greet/{name}") {
+      get("bye") {
+        val name: String by call.pathParameters
+        call.respondText("Bye, $name")
+      }
+      get("hello/{hour}") {
+        val name: String by call.pathParameters
+        val hour: Int by call.pathParameters
+        call.respondText("Hello, $name, it's $hour o'clock")
+      }
     }
   }
 }
@@ -268,9 +242,8 @@ fun Application.module(github: GitHubService) {
   install(io.ktor.server.plugins.contentnegotiation.ContentNegotiation) { json() }
   routing {
     get("/github/{username}") {
-      val user = call.parameters["username"]
-        ?: return@get call.respond(HttpStatusCode.BadRequest)
-      github(github, user)
+      val username: String by call.pathParameters
+      github(github, username)
     }
   }
 }
@@ -300,7 +273,6 @@ fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
   application { module() }
   val client = createClient {
     install(ContentNegotiation) { json() }
-    install(Resources)
     expectSuccess = true
   }
   test(client)

@@ -3,7 +3,7 @@ package github
 import io.ktor.server.routing.RoutingContext
 
 /**
- * Exercise 3 / 5: two requests, one scope.
+ * Exercise 2 / 4: two requests, one scope.
  *
  * `profile` fetches the user info and the repositories of [name] from
  * [github] concurrently: `coroutineScope { }`, one `async { }` per call,

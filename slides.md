@@ -46,7 +46,7 @@ kodee: wave
 
 1. Your first Ktor server
 2. Requests and responses
-3. Type-safe routing and HTML
+3. Typed parameters and HTML
 4. Sessions and static content
 5. Talking to other services
 6. WebSockets and OpenAPI

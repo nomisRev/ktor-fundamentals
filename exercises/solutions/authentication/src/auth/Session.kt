@@ -9,12 +9,11 @@ import io.ktor.server.auth.install
 import io.ktor.server.auth.principal
 import io.ktor.server.auth.session
 import io.ktor.server.auth.setSession
-import io.ktor.server.resources.Resources
-import io.ktor.server.resources.get
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 
@@ -34,12 +33,11 @@ val sessionAuth = session<UserInfo, UserIdPrincipal>("auth-session") {
 }
 
 fun Application.sessionModule() {
-  install(Resources)
   install(sessionAuth)
   routing {
     login()
     authenticateWith(sessionAuth) {
-      get<Greeting.Hello> {
+      get("/greet/{name}/hello/{hour}") {
         call.respondText("Hello, ${call.principal.name} in ${call.session.timezone}")
       }
     }

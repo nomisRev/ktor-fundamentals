@@ -1,11 +1,10 @@
 # Call another API from a route
 
 The public JSON API is GitHub, as on the slides; the DTOs are given in
-`src/github/GitHub.kt`, the resources are exercise 1 (the tests do not
-compile until `object GitHub` exists). The rest follows the slides: the
-client (`Client.kt`), the concurrent handler (`Profile.kt`), the
-`AutoCloseable` implementation (`GitHubService.kt`) and the DI wiring
-(`Application.kt`). Check them with
+`src/github/GitHub.kt`. The rest follows the slides: the client
+(`Client.kt`, exercise 1), the concurrent handler (`Profile.kt`, exercise 2),
+the `AutoCloseable` implementation (`GitHubService.kt`, exercise 3) and the
+DI wiring (`Application.kt`, exercise 4). Check them with
 `./kotlin test --include-module http-client` from `exercises/`.
 
 The tests never reach the real GitHub: `externalServices { hosts(...) }`

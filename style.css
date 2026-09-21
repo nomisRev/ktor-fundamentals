@@ -80,6 +80,7 @@
   --fundamentals-purple: #7954f6;
   --fundamentals-pink: #eb55e6;
   --fundamentals-ink: #1f2023;
+  --fundamentals-blue: var(--code-window-amper-color);
 
   /* Default colour for DrawnAnnotation strokes and labels. Keep the hard
      fallback: a token that resolves invalid makes the strokes vanish instead

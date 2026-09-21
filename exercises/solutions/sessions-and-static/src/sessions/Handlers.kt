@@ -7,6 +7,7 @@ import io.ktor.server.sessions.clear
 import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
+import io.ktor.server.util.getValue
 import kotlinx.html.body
 import kotlinx.html.h1
 import kotlinx.html.head
@@ -15,7 +16,8 @@ import kotlinx.html.link
 import kotlinx.html.p
 import kotlinx.html.title
 
-suspend fun RoutingContext.hello(req: Greeting.Hello) {
+suspend fun RoutingContext.hello() {
+  val name: String by call.pathParameters
   val visits = (call.sessions.get<Visits>()?.count ?: 0) + 1
   call.sessions.set(Visits(visits))
   call.respondHtml {
@@ -25,13 +27,14 @@ suspend fun RoutingContext.hello(req: Greeting.Hello) {
     }
     body {
       img(src = "/assets/logo.svg", alt = "Ktor")
-      h1 { +"Hello, ${req.parent.name}" }
+      h1 { +"Hello, $name" }
       p { +"Visit $visits" }
     }
   }
 }
 
-suspend fun RoutingContext.bye(req: Greeting.Bye) {
+suspend fun RoutingContext.bye() {
+  val name: String by call.pathParameters
   call.sessions.clear<Visits>()
-  call.respondText("Bye, ${req.parent.name}")
+  call.respondText("Bye, $name")
 }

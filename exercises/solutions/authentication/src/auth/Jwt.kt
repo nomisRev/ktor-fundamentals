@@ -12,11 +12,10 @@ import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.auth.principal
 import io.ktor.server.auth.withRoles
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.resources.Resources
-import io.ktor.server.resources.get
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import java.util.Date
@@ -47,11 +46,10 @@ private fun Route.issueToken(secret: String) {
 
 fun Application.jwtModule(secret: String) {
   install(ContentNegotiation) { json() }
-  install(Resources)
   routing {
     issueToken(secret)
     authenticateWith(jwtAuth(secret)) {
-      get<Greeting.Hello> {
+      get("/greet/{name}/hello/{hour}") {
         call.respondText("Hello, ${call.principal.name}")
       }
     }
@@ -60,14 +58,13 @@ fun Application.jwtModule(secret: String) {
 
 fun Application.adminModule(secret: String) {
   install(ContentNegotiation) { json() }
-  install(Resources)
   val adminAuth = jwtAuth(secret).withRoles { user ->
     if (user.name == "ada") setOf(Role.Admin, Role.User) else setOf(Role.User)
   }
   routing {
     issueToken(secret)
     authenticateWith(adminAuth, roles = setOf(Role.Admin)) {
-      get<Greeting.Hello> {
+      get("/greet/{name}/hello/{hour}") {
         call.respondText("Hello, ${call.principal.name}")
       }
     }

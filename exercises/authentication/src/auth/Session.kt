@@ -31,9 +31,9 @@ val sessionAuth: SessionAuthenticationScheme<UserInfo, UserIdPrincipal>
 /**
  * Exercise 3 / 7: guard with the session scheme.
  *
- * `sessionModule` installs `Resources` and `install(sessionAuth)`, which puts
- * the `Sessions` plug-in in place for the scheme's cookie. The routes are
- * [login] and, inside `authenticateWith(sessionAuth) { }`, `get<Greeting.Hello>`,
+ * `sessionModule` calls `install(sessionAuth)`, which puts the `Sessions`
+ * plug-in in place for the scheme's cookie. The routes are [login] and,
+ * inside `authenticateWith(sessionAuth) { }`, `get("/greet/{name}/hello/{hour}")`,
  * which responds with `Hello, ada in CET`: `call.principal.name` and
  * `call.session.timezone`.
  */

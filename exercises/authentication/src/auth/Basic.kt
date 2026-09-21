@@ -28,7 +28,7 @@ val basicAuth: SimpleAuthenticationScheme<UserIdPrincipal>
 /**
  * Exercise 1 / 7: guard with `basic`.
  *
- * `basicModule` installs `Resources` and registers `get<Greeting.Hello>` inside
+ * `basicModule` registers `get("/greet/{name}/hello/{hour}")` inside
  * `authenticateWith(basicAuth) { }`. The handler reads `call.principal`, a
  * non-null `UserIdPrincipal`, and responds with the text `Hello, ada`, the
  * name from the credentials.

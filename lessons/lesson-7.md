@@ -240,6 +240,131 @@ Context parameters are Kotlin 2.2+, `-Xcontext-parameters`; a plain
 
 ---
 
+# Validation is a plug-in
+
+> Lesson 2 answered `400` for a blank name by hand
+
+<DrawnAnnotation text="install(RequestValidation)" label="`ktor-server-request-validation`: runs after `ContentNegotiation` built the object" :geometry="{ label: { x: 0.73, y: 0.352, width: 0.5 } }" />
+<DrawnAnnotation text="validate<Greeting>" />
+<DrawnAnnotation text="ValidationResult.Invalid(" />
+<DrawnAnnotation text="ValidationResult.Valid" label="One rule per body type: the handler only ever sees a valid one" :geometry="{ label: { x: 0.71, y: 0.52, width: 0.5 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.requestvalidation.RequestValidation
+import io.ktor.server.plugins.requestvalidation.ValidationResult
+
+fun Application.module() {
+  install(RequestValidation) {
+    validate<Greeting> { greeting ->
+      if (greeting.name.isBlank()) ValidationResult.Invalid("name is blank")
+      else ValidationResult.Valid
+    }
+  }
+  routes()
+}
+```
+
+<!--
+`Greeting` is lesson 2's DTO. The rule is stated once, next to the
+plug-ins, and every `call.receive<Greeting>()` in the application runs
+it: a handler that gets a `Greeting` gets a valid one. The block
+suspends, so a lookup is welcome; `validate { filter { }; validation { } }`
+matches on anything other than the type. What happens with an invalid
+body is the next slide.
+-->
+
+---
+magic-move
+---
+
+# A failed validation is a `400`
+
+<DrawnAnnotation text="install(StatusPages)" label="An exception like any other: `StatusPages` gives it its status" :geometry="{ label: { x: 0.675, y: 0.525, width: 0.63 } }" />
+<DrawnAnnotation text="exception<RequestValidationException>" />
+<DrawnAnnotation text="cause.reasons" label="Every `Invalid` reason, collected" :geometry="{ label: { x: 0.45, y: 0.666, width: 0.5 } }" />
+
+```kotlin
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.requestvalidation.RequestValidation
+import io.ktor.server.plugins.requestvalidation.RequestValidationException
+import io.ktor.server.plugins.requestvalidation.ValidationResult
+import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.response.respond
+
+fun Application.module() {
+  install(RequestValidation) {
+    validate<Greeting> { greeting ->
+      if (greeting.name.isBlank()) ValidationResult.Invalid("name is blank")
+      else ValidationResult.Valid
+    }
+  }
+  install(StatusPages) {
+    exception<RequestValidationException> { call, cause ->
+      call.respond(HttpStatusCode.BadRequest, cause.reasons.joinToString())
+    }
+  }
+  routes()
+}
+```
+
+<!--
+The plug-in throws; it does not answer. That is on purpose: the shape of
+the error response is yours, and `StatusPages` from the start of this
+lesson is where it is decided, once, for every route. A JSON API
+responds with a `@Serializable` error object here instead of a string.
+Without the handler the exception is an ordinary `500`.
+-->
+
+---
+
+# A plug-in can be scoped to a route
+
+<DrawnAnnotation text="route(&quot;/greet&quot;)" label="Only this subtree validates: `route { }` has its own `install`" :geometry="{ label: { x: 0.65, y: 0.289, width: 0.62 } }" />
+<DrawnAnnotation text="install(RequestValidation)" label="`CallId`, `CORS`, `RateLimit`, `Authentication` install the same way" :geometry="{ label: { x: 0.75, y: 0.36, width: 0.46 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.requestvalidation.RequestValidation
+import io.ktor.server.plugins.requestvalidation.ValidationResult
+import io.ktor.server.request.receive
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.post
+import io.ktor.server.routing.route
+import io.ktor.server.routing.routing
+
+fun Application.module() {
+  routing {
+    route("/greet") {
+      install(RequestValidation) {
+        validate<Greeting> { greeting ->
+          if (greeting.name.isBlank()) ValidationResult.Invalid("name is blank")
+          else ValidationResult.Valid
+        }
+      }
+      post {
+        call.respondText("Hello, ${call.receive<Greeting>().name}")
+      }
+    }
+  }
+}
+```
+
+<!--
+Most plug-ins are `RouteScopedPlugin`s: installed on the application
+they apply everywhere, installed inside a `route { }` only below it. An
+admin subtree with stricter validation, a public one with `CORS`, a
+login route with a rate limit, lesson 8: the pipeline is per route as
+much as per application. `createRouteScopedPlugin` is the
+`createApplicationPlugin` of the next slide for your own.
+-->
+
+---
+
 # A plug-in hooks into the pipeline
 
 > When `StatusPages` is not enough, write your own
@@ -481,21 +606,20 @@ the application on a test engine and hands out a client that calls it
 directly: fast, isolated, no free port needed. `application { }` is the
 module, `createClient { }` builds more clients. Kotest's `shouldBe` is a
 matcher; the runner is JUnit 5, `@Test` from `org.junit.jupiter.api`.
-Mind the imports: there is a `get` for routes, a `get` for the client,
-and one more for each with `@Resource`; the IDE offers all of them.
+Mind the imports: there is a `get` for routes and a `get` for the
+client; the IDE offers both.
 -->
 
 ---
 
 # A helper owns the set-up
 
-<DrawnAnnotation text="createClient {" label="A client with plug-ins: JSON bodies and `@Resource` URLs, as in lesson 5" :geometry="{ label: { x: 0.72, y: 0.29, width: 0.44 } }" />
+<DrawnAnnotation text="createClient {" label="A client with plug-ins: JSON bodies, as in lesson 5" :geometry="{ label: { x: 0.72, y: 0.29, width: 0.44 } }" />
 <DrawnAnnotation text="test(client)" label="The test receives the client and nothing else" :geometry="{ label: { x: 0.76, y: 0.48, width: 0.36 } }" />
 
 ```kotlin
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.resources.Resources
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.testApplication
 
@@ -503,7 +627,6 @@ fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
   application { module() }
   val client = createClient {
     install(ContentNegotiation) { json() }
-    install(Resources)
   }
   test(client)
 }
@@ -526,7 +649,6 @@ magic-move
 ```kotlin
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.resources.Resources
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.testApplication
 
@@ -534,7 +656,6 @@ fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
   application { module() }
   val client = createClient {
     install(ContentNegotiation) { json() }
-    install(Resources)
     expectSuccess = true
   }
   test(client)
@@ -553,25 +674,24 @@ default one.
 
 # The test is only the test
 
-<DrawnAnnotation text="Greeting.Bye(&quot;alex&quot;)" label="The `@Resource` of lesson 3 builds `/greet/alex/bye`; the URL is never typed" :geometry="{ label: { x: 0.72, y: 0.5, width: 0.44 } }" />
+<DrawnAnnotation text="&quot;/greet/alex/bye&quot;" label="The URL is the whole request: the helper owns everything else" :geometry="{ label: { x: 0.72, y: 0.5, width: 0.44 } }" />
 
 ```kotlin
 import io.kotest.matchers.shouldBe
-import io.ktor.client.plugins.resources.get
+import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import org.junit.jupiter.api.Test
 
 @Test
 fun bye() = appTest { client ->
-  client.get(Greeting.Bye("alex")).status shouldBe HttpStatusCode.OK
+  client.get("/greet/alex/bye").status shouldBe HttpStatusCode.OK
 }
 ```
 
 <!--
 Still inside `GreetingTest`. No set-up in sight: the helper owns it, the
-test states the request and the expectation. The resource classes are
-shared with the server, so a renamed route breaks this test at compile
-time rather than with a `404`.
+test states the request and the expectation. A renamed route shows up
+here as a `404`, and `expectSuccess` turns that into a failing test.
 -->
 
 ---
@@ -580,22 +700,24 @@ time rather than with a `404`.
 
 > Properties instead of examples: any name should get a goodbye
 
-<DrawnAnnotation text="checkAll(Arb.string())" label="Kotest runs the block a thousand times: empty, long, and odd strings first" :geometry="{ label: { x: 0.72, y: 0.66, width: 0.44 } }" />
-<DrawnAnnotation text="Greeting.Bye(name)" />
+<DrawnAnnotation text="checkAll(Arb.string())" label="Kotest runs the block a thousand times: empty, long, and odd strings first" :geometry="{ label: { x: 0.72, y: 0.7, width: 0.44 } }" />
+<DrawnAnnotation text="encodeURLPathPart()" label="A generated name may contain `/` or `?`: encode it as one segment" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
 
 ```kotlin
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
-import io.ktor.client.plugins.resources.get
+import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.encodeURLPathPart
 import org.junit.jupiter.api.Test
 
 @Test
 fun anyName() = appTest { client ->
   checkAll(Arb.string()) { name ->
-    client.get(Greeting.Bye(name)).status shouldBe HttpStatusCode.OK
+    val response = client.get("/greet/${name.encodeURLPathPart()}/bye")
+    response.status shouldBe HttpStatusCode.OK
   }
 }
 ```
@@ -625,7 +747,6 @@ for every basic type and combinators to build your own.
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.cookies.HttpCookies
-import io.ktor.client.plugins.resources.Resources
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.testing.testApplication
 
@@ -633,7 +754,6 @@ fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
   application { module() }
   val client = createClient {
     install(ContentNegotiation) { json() }
-    install(Resources)
     install(HttpCookies)
     expectSuccess = true
   }
@@ -698,14 +818,13 @@ magic-move
 
 # Other services are mocked in the test
 
-<DrawnAnnotation text="defaultRequest { url(&quot;https://api.github.com&quot;) }" label="A test client, so the mock answers; the base URL makes resources absolute" :geometry="{ label: { x: 0.8, y: 0.6, width: 0.28 } }" />
+<DrawnAnnotation text="defaultRequest { url(&quot;https://api.github.com&quot;) }" label="A test client, so the mock answers; the base URL completes the relative paths" :geometry="{ label: { x: 0.8, y: 0.6, width: 0.28 } }" />
 <DrawnAnnotation text="module(GitHubHttp(github))" label="The service gets the test client: lesson 5's DI, done by the test" :geometry="{ label: { x: 0.8, y: 0.76, width: 0.28 } }" />
 
 ```kotlin
 import io.kotest.matchers.shouldBe
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.plugins.resources.Resources
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -727,7 +846,6 @@ fun profile() = testApplication {
   }
   val github = createClient {
     install(ContentNegotiation) { json() }
-    install(Resources)
     defaultRequest { url("https://api.github.com") }
   }
   application { module(GitHubHttp(github)) }
@@ -742,6 +860,53 @@ mock answers `/users/alex`; `/users/alex/repos` has no route, `404`, and
 `GitHubHttp` turns that into an empty list. Mocks are fast and can fail
 on command; they are also not the real thing, so keep one integration
 test against the real API, or a container, for the contract.
+-->
+
+---
+
+# The service is tested without a server
+
+<DrawnAnnotation text="MockEngine { request ->" label="`ktor-client-mock`: an engine that answers from a lambda, no socket" :geometry="{ label: { x: 0.74, y: 0.32, width: 0.46 } }" />
+<DrawnAnnotation text="GitHubHttp(client)" label="Lesson 5's implementation, alone: no `testApplication`, no routes" :geometry="{ label: { x: 0.47, y: 0.807, width: 0.7 } }" />
+<DrawnAnnotation text="runTest" label="`kotlinx-coroutines-test`: a `suspend` test body" :geometry="{ label: { x: 0.62, y: 0.242, width: 0.48 } }" />
+
+```kotlin
+import io.kotest.matchers.shouldBe
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.http.HttpHeaders
+import io.ktor.http.headersOf
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Test
+
+@Test
+fun userInfo() = runTest {
+  val engine = MockEngine { request ->
+    respond(
+      content = """{"name": "Alex", "bio": null, "avatar_url": null}""",
+      headers = headersOf(HttpHeaders.ContentType, "application/json"),
+    )
+  }
+  val client = HttpClient(engine) {
+    install(ContentNegotiation) { json() }
+    defaultRequest { url("https://api.github.com") }
+  }
+  GitHubHttp(client).getUserInfo("alex")?.name shouldBe "Alex"
+}
+```
+
+<!--
+The other unit: `externalServices` tests the route and the service
+together, `MockEngine` tests the service and nothing else. The engine is
+the client's lowest layer, so every plug-in above it, `ContentNegotiation`
+included, runs for real; `request.url.encodedPath` in the lambda
+branches on the path, `respondError(HttpStatusCode.NotFound)` plays a
+missing user. Both mocks are fast and both lie a little; the contract
+test against GitHub stays.
 -->
 
 ---
@@ -942,15 +1107,146 @@ test, Prometheus in production, both through `ktor-server-di`.
 
 ---
 
+# Every application has a logger
+
+<DrawnAnnotation text="log.info(" label="`Application.log`: SLF4J, behind the generator's `logback.xml`" :geometry="{ label: { x: 0.73, y: 0.242, width: 0.46 } }" />
+<DrawnAnnotation text="call.application.log" label="The same logger from a handler" :geometry="{ label: { x: 0.84, y: 0.43, width: 0.32 } }" />
+<DrawnAnnotation text="&quot;{} is leaving&quot;, name" label="A placeholder, not a template: formatted only when the level is on" :geometry="{ label: { x: 0.73, y: 0.5, width: 0.5 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.log
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+import io.ktor.server.util.getValue
+
+fun Application.module() {
+  log.info("Greetings module loaded")
+  routing {
+    get("/greet/{name}/bye") {
+      val name: String by call.pathParameters
+      call.application.log.warn("{} is leaving", name)
+      call.respondText("Bye, $name")
+    }
+  }
+}
+```
+```console
+INFO  Application - Greetings module loaded
+WARN  Application - alex is leaving
+```
+
+<!--
+The metrics say how often; the log says what happened. `log` is the
+SLF4J logger of the application, the same facade the whole JVM uses,
+and logback behind it is what the generator's `logback.xml` configures:
+levels per package, `io.ktor` at `INFO`, the format of a line. The
+`Logger` interface earlier in this lesson stood in for this one. Log
+with placeholders, never `"$name is leaving"`: the string is only built
+when `WARN` is enabled, and the arguments stay separate for a JSON
+encoder. `KtorSimpleLogger("name")` is the multiplatform variant.
+-->
+
+---
+
+# `CallLogging` writes one line per request
+
+<DrawnAnnotation text="install(CallLogging)" label="`ktor-server-call-logging`: method, path, status, duration, after the response" :geometry="{ label: { x: 0.66, y: 0.242, width: 0.6 } }" />
+<DrawnAnnotation text="filter { call ->" label="Not the scrape: Prometheus every 15 seconds would drown the log" :geometry="{ label: { x: 0.55, y: 0.384, width: 0.7 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.request.path
+import org.slf4j.event.Level
+
+fun Application.module() {
+  install(CallLogging) {
+    level = Level.INFO
+    filter { call -> !call.request.path().startsWith("/metrics") }
+  }
+  routes()
+}
+```
+```console
+INFO  Application - 200 OK: GET - /greet/alex/bye in 3ms
+INFO  Application - 404 Not Found: GET - /nowhere in 1ms
+```
+
+<!--
+The access log, as a plug-in. One line per call after it completes, at
+the level you choose, for the calls the filter keeps. `format { call -> }`
+writes your own line; `mdc("user") { call -> … }` computes a value once
+per request and puts it in the MDC, the mapped diagnostic context, so
+every line logged while that request runs carries it, from any class.
+That is what the next slide uses.
+-->
+
+---
+magic-move
+---
+
+# `CallId` correlates the lines
+
+<DrawnAnnotation text="header(HttpHeaders.XRequestId)" label="Reuse the caller's or the proxy's id, and echo it back" :geometry="{ label: { x: 0.72, y: 0.289, width: 0.5 } }" />
+<DrawnAnnotation text="generate(length = 12)" label="Otherwise mint one" :geometry="{ label: { x: 0.52, y: 0.336, width: 0.3 } }" />
+<DrawnAnnotation text="callIdMdc(&quot;call-id&quot;)" label="Into the MDC: `%X{call-id}` in `logback.xml` puts it on every line of the request" :geometry="{ label: { x: 0.66, y: 0.6, width: 0.6 } }" />
+
+```kotlin
+import io.ktor.http.HttpHeaders
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.callid.CallId
+import io.ktor.server.plugins.callid.callIdMdc
+import io.ktor.server.plugins.callid.generate
+import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.request.path
+import org.slf4j.event.Level
+
+fun Application.module() {
+  install(CallId) {
+    header(HttpHeaders.XRequestId)
+    generate(length = 12)
+  }
+  install(CallLogging) {
+    level = Level.INFO
+    filter { call -> !call.request.path().startsWith("/metrics") }
+    callIdMdc("call-id")
+  }
+  routes()
+}
+```
+```console
+INFO  [k7d2m9x1q4z8] Application - alex is leaving
+INFO  [k7d2m9x1q4z8] Application - 200 OK: GET - /greet/alex/bye in 3ms
+```
+
+<!--
+A request touches several classes and, with lesson 5's client, several
+services; without an id the lines of one request are scattered between
+the lines of every other. `CallId` establishes one per call: taken from
+`X-Request-ID` when the caller or the proxy sent it, generated
+otherwise, and echoed in the response so the client can quote it. The
+MDC puts it on every log line, and `ktor-client-call-id` forwards it to
+the services this one calls. A metric is a tag, a log line has an id,
+and the step after that, one span per call across services, is the
+`ktor-server-opentelemetry` plug-in.
+-->
+
+---
+
 # Failures, tests, and numbers
 
 - `StatusPages { status(…), exception<T> { } }` → every failure, your page
+- `RequestValidation { validate<T> { } }` → a bad body is a `400`, with reasons
 - `createApplicationPlugin { transformBody { } }` → your own hook
-- `testApplication { application { }; client }` → one process
+- `testApplication { }`, `MockEngine { }` → one process, or no server at all
 - `checkAll(Arb.string())`, `externalServices { }` → generated, mocked
-- `install(MicrometerMetrics)`, `/metrics` → numbers Prometheus pulls
+- `MicrometerMetrics`, `CallLogging`, `CallId` → numbers, lines, an id per request
 
-> **A failure is a response, a test is a call, a metric is a tag.**
+> **A failure is a response, a test is a call, a metric is a tag, a log line has an id.**
 >
 > Never the exception message; always the same pipeline.
 

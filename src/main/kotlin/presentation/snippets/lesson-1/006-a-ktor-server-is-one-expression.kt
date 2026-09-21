@@ -4,6 +4,7 @@
 package presentation.snippets.lesson1.slide6
 
 import presentation.support.*
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.response.respondText
@@ -14,7 +15,10 @@ fun main() {
   embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
     routing {
       get("/") {
-        call.respondText("Hello world!")
+        call.respondText(
+          text = "Hello world!",
+          status = HttpStatusCode.OK,
+        )
       }
     }
   }.start(wait = true)

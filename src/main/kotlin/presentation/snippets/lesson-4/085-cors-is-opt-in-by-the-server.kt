@@ -10,11 +10,7 @@ import io.ktor.server.plugins.cors.routing.CORS
 
 fun Application.module() {
   install(CORS) {
-    allowHost(
-      "example.com",
-      schemes = listOf("https"),
-      subDomains = listOf("www", "app"),
-    )
+    anyHost()
   }
   routes()
 }

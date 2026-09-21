@@ -8,17 +8,12 @@ import io.ktor.server.routing.Route
 import io.ktor.server.websocket.receiveDeserialized
 import io.ktor.server.websocket.sendSerialized
 import io.ktor.server.websocket.webSocket
-import kotlinx.coroutines.channels.ClosedReceiveChannelException
 
 fun Route.greet() {
   webSocket("/greet") {
-    try {
-      while (true) {
-        val req = receiveDeserialized<Request>()
-        sendSerialized(Response("Hello, ${req.name}"))
-      }
-    } catch (e: ClosedReceiveChannelException) {
-      // the client closed the socket
+    while (true) {
+      val req = receiveDeserialized<Request>()
+      sendSerialized(Response("Hello, ${req.name}"))
     }
   }
 }

@@ -45,7 +45,9 @@ fun Application.module() {
 `call.request.headers` is read-only and case-insensitive; `call.response.headers`
 accumulates what goes out. A handler rarely touches either: `Content-Type` and
 `Content-Length` are written by the response functions, compression rewrites
-`Content-Encoding`, and so on. Lesson 1 called this the pipeline.
+`Content-Encoding`, and so on. Lesson 1 called this the pipeline. Even
+`X-Request-Id` has a plug-in: lesson 7's `CallId` reads it, or mints one,
+and puts it on every log line of the request.
 -->
 
 ---
@@ -150,7 +152,7 @@ fun Application.module() {
 <!--
 `call.parameters` holds the captured segments. The value is present whenever
 this handler runs, but the type system cannot know that from a string pattern,
-hence the nullable type. Lesson 3 fixes that with type-safe routing.
+hence the nullable type. Lesson 3 fixes that with property delegation.
 -->
 
 ---
@@ -234,6 +236,93 @@ object the request is about, typical for `GET`; the body carries the object
 itself, typical for `POST` and `PUT`; query parameters tweak the request and
 are usually optional. Follow the specification of the service you implement.
 `Greeting` and the plug-in behind `receive` are the second half of this lesson.
+-->
+
+---
+
+# A form is a body too
+
+<DrawnAnnotation text="application/x-www-form-urlencoded" label="What `<form method=&quot;post&quot;>` sends: `key=value` pairs, like a query string" :geometry="{ label: { x: 0.8, y: 0.289, width: 0.36 } }" />
+<DrawnAnnotation text="call.receiveParameters()" label="The same `Parameters` map as the query: `[&quot;name&quot;]`, `getAll`, lesson 3's `by`" :geometry="{ label: { x: 0.79, y: 0.61, width: 0.38 } }" />
+
+```http
+POST /greet HTTP/1.1
+Host: example.com
+Content-Type: application/x-www-form-urlencoded
+
+type=hello&name=Alex&timezone=CET
+```
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.request.receiveParameters
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
+
+fun Application.module() {
+  routing {
+    post("/greet") {
+      val form = call.receiveParameters()
+      call.respondText("Hello, ${form["name"]}")
+    }
+  }
+}
+```
+
+<!--
+The oldest body on the web: a browser posts a form as `key=value` pairs,
+percent-encoded, exactly like a query string moved into the body. No
+`ContentNegotiation` needed, Ktor parses this one itself. Lesson 3 renders
+the `<form>` with `kotlinx.html`; lesson 8's `form` scheme reads a username
+and a password out of the same map.
+-->
+
+---
+
+# A file arrives in parts
+
+<DrawnAnnotation text="receiveMultipart()" label="Fields and files, part by part" :geometry="{ label: { x: 0.82, y: 0.336, width: 0.32 } }" />
+<DrawnAnnotation text="is PartData.FileItem" label="A file; a field is a `FormItem`" :geometry="{ label: { x: 0.7, y: 0.384, width: 0.4 } }" />
+<DrawnAnnotation text="copyAndClose(" label="Streamed to disk, never whole in memory" :geometry="{ label: { x: 0.62, y: 0.525, width: 0.44 } }" />
+<DrawnAnnotation text="part.dispose()" label="Release the part" :geometry="{ label: { x: 0.5, y: 0.572, width: 0.3 } }" />
+
+```kotlin
+import io.ktor.http.content.PartData
+import io.ktor.http.content.forEachPart
+import io.ktor.server.application.Application
+import io.ktor.server.request.receiveMultipart
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
+import io.ktor.util.cio.writeChannel
+import io.ktor.utils.io.copyAndClose
+import java.io.File
+
+fun Application.module() {
+  routing {
+    post("/avatar") {
+      call.receiveMultipart().forEachPart { part ->
+        if (part is PartData.FileItem) {
+          val file = File("uploads/${part.originalFileName ?: "avatar"}")
+          part.provider().copyAndClose(file.writeChannel())
+        }
+        part.dispose()
+      }
+      call.respondText("Uploaded")
+    }
+  }
+}
+```
+
+<!--
+A `<form enctype="multipart/form-data">` with an `<input type="file">`
+sends every field and every file as a part with its own headers.
+`receiveMultipart` hands them over in order, so a large upload is copied
+to disk as it arrives; `provider()` is the `ByteReadChannel` of the
+part. Field parts are `PartData.FormItem` with a `value`, and
+`formFieldLimit` on `receiveMultipart` caps how large one may grow. Never
+trust `originalFileName` as a path: strip it to a file name first.
 -->
 
 ---
@@ -654,8 +743,10 @@ fun Application.module() {
 <!--
 `Greeting` is the data class from the previous slides. A body that does not
 parse, or a `Content-Type` nobody registered, ends in a `400` or `415` before
-the handler runs. `receive` reads the body once; a second call returns the
-same object.
+the handler runs. `receive` reads the body once: a second call throws
+`RequestAlreadyConsumedException`, unless the `DoubleReceive` plug-in is
+installed to cache it. A body that may be absent is `receive<Greeting?>()`,
+since Ktor 3.6.
 -->
 
 ---
@@ -714,7 +805,7 @@ fun Application.module() {
 <!--
 Same shape on both sides: annotate, then `receive` and `respond` with your
 own classes. What is next: the route and its parameters are still strings;
-lesson 3 makes them types with the `Resources` plug-in, and renders HTML
+lesson 3 turns them into typed properties with delegation, and renders HTML
 with `kotlinx.html` for the pages that are not JSON.
 -->
 
@@ -725,6 +816,7 @@ with `kotlinx.html` for the pages that are not JSON.
 - `call.request.headers[…]`, `call.response.header(…)` → headers
 - `{name}` → `call.parameters`, `?key=value` → `queryParameters`
 - `call.receive<T>()`, `call.respond(status, T)` → the body, typed
+- `receiveParameters()`, `receiveMultipart()` → forms and files
 - `ContentNegotiation` + `@Serializable` → the conversion
 
 > **The handler reads and writes Kotlin objects.**

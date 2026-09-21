@@ -9,11 +9,12 @@ interface GitHubService {
 }
 
 /**
- * Exercise 4 / 5: the implementation owns the client.
+ * Exercise 3 / 4: the implementation owns the client.
  *
- * `getUserInfo` gets `GitHub.User(user)` and returns its body when the status
- * is `OK`, `null` otherwise; `getUserRepos` does the same for
- * `GitHub.User.Repos`. `close` closes the client, so that the DI plug-in can
+ * `getUserInfo` gets `/users/$user` and returns its body when the status is
+ * `OK`, `null` otherwise; `getUserRepos` does the same for
+ * `/users/$user/repos`. The base URL comes from the client's
+ * `defaultRequest`. `close` closes the client, so that the DI plug-in can
  * close the service when the application stops.
  */
 class GitHubHttp(

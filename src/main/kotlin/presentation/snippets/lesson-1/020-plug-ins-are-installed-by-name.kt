@@ -8,11 +8,23 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.plugins.compression.Compression
+import io.ktor.server.plugins.compression.CompressionConfig
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.RoutingRoot
+import io.ktor.server.routing.get
 
 fun Application.module() {
   install(ContentNegotiation) {
     json()
   }
-  install(Compression)
+  install(Compression) {
+    mode = CompressionConfig.Mode.All
+  }
+
+  install(RoutingRoot) {
+    get("/") {
+      call.respondText("Hello world!")
+    }
+  }
 }

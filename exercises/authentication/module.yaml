@@ -5,7 +5,6 @@ apply:
 
 dependencies:
   - io.ktor:ktor-server-core:3.6.0
-  - io.ktor:ktor-server-resources:3.6.0
   - io.ktor:ktor-server-sessions:3.6.0
   - io.ktor:ktor-server-auth:3.6.0
   - io.ktor:ktor-server-auth-jwt:3.6.0

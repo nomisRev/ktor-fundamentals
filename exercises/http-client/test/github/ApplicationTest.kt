@@ -6,12 +6,9 @@ import io.ktor.client.plugins.HttpRequestRetry
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.plugins.pluginOrNull
-import io.ktor.client.plugins.resources.Resources
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
-import io.ktor.resources.href
-import io.ktor.resources.serialization.ResourcesFormat
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
@@ -68,24 +65,15 @@ private fun ApplicationTestBuilder.mockGitHub(): HttpClient {
   }
   return createClient {
     install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
-    install(Resources)
     defaultRequest { url("https://api.github.com") }
   }
 }
 
 class ApplicationTest {
   @Test
-  fun `the resources describe GitHub's paths`() {
-    val format = ResourcesFormat()
-    assertEquals("/users/ada", href(format, GitHub.User(username = "ada")))
-    assertEquals("/users/ada/repos", href(format, GitHub.User.Repos(user = GitHub.User(username = "ada"))))
-  }
-
-  @Test
   fun `the client has its plug-ins`() {
     client().use { client ->
       assertNotNull(client.pluginOrNull(ContentNegotiation), "ContentNegotiation is not installed")
-      assertNotNull(client.pluginOrNull(Resources), "Resources is not installed")
       assertNotNull(client.pluginOrNull(DefaultRequest), "defaultRequest is not configured")
       assertNotNull(client.pluginOrNull(HttpRequestRetry), "HttpRequestRetry is not installed")
     }

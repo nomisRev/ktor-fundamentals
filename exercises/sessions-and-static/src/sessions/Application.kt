@@ -2,8 +2,8 @@ package sessions
 
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import io.ktor.server.resources.Resources
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
+import io.ktor.server.routing.route
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.routing
 
@@ -30,10 +30,11 @@ fun Application.cors(): Unit = TODO()
 fun Application.module() {
   sessions()
   cors()
-  install(Resources)
   routing {
     assets()
-    get<Greeting.Hello> { hello(it) }
-    get<Greeting.Bye> { bye(it) }
+    route("/greet/{name}") {
+      get("hello") { hello() }
+      get("bye") { bye() }
+    }
   }
 }

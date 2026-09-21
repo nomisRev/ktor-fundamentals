@@ -305,6 +305,73 @@ guaranteed close frame wrap the `close` in `withContext(NonCancellable)`.
 
 ---
 
+# Server-Sent Events go one way
+
+> Half a WebSocket: the server pushes, the client listens
+
+<DrawnAnnotation text="install(SSE)" label="`ktor-server-sse`: a `GET` whose response never ends" :geometry="{ label: { x: 0.52, y: 0.352, width: 0.52 } }" />
+<DrawnAnnotation text="sse(&quot;/countdown&quot;)" label="A route like `get`; the block runs until it returns or the client leaves" :geometry="{ label: { x: 0.65, y: 0.446, width: 0.5 } }" />
+<DrawnAnnotation text="send(ServerSentEvent(&quot;$n&quot;))" label="One `data:` line per event; `event`, `id` and `retry` are optional" :geometry="{ label: { x: 0.72, y: 0.54, width: 0.48 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.routing.routing
+import io.ktor.server.sse.SSE
+import io.ktor.server.sse.sse
+import io.ktor.sse.ServerSentEvent
+import kotlinx.coroutines.delay
+
+fun Application.module() {
+  install(SSE)
+  routing {
+    sse("/countdown") {
+      for (n in 10 downTo 1) {
+        send(ServerSentEvent("$n"))
+        delay(1000)
+      }
+    }
+  }
+}
+```
+
+<!--
+Progress bars, notifications, a stream of tokens from a model: the
+client has nothing to say back, so a WebSocket is more than it needs.
+Server-Sent Events are a `text/event-stream` response over plain HTTP
+that stays open, one event per block; proxies and load balancers see an
+ordinary request. `heartbeat { }` keeps an idle connection from being
+dropped, `sse(path, serialize = …)` sends `@Serializable` objects as
+JSON, and `ktor-client-sse` is the client side.
+-->
+
+---
+
+# The stream is plain text
+
+<DrawnAnnotation text="text/event-stream" label="The browser's `EventSource` reads this; the connection stays open" :geometry="{ label: { x: 0.73, y: 0.242, width: 0.46 } }" />
+<DrawnAnnotation text="data: 10" label="One event, ended by a blank line: `onmessage` fires per block" :geometry="{ label: { x: 0.55, y: 0.336, width: 0.5 } }" />
+
+```http
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+
+data: 10
+
+data: 9
+```
+
+<!--
+`new EventSource("/countdown").onmessage = e => …` in any browser, no
+library. The client reconnects on its own when the connection drops and
+sends `Last-Event-ID` with the `id` of the last event it saw, so a
+server that numbers its events can resume where it left off. `event:`
+names a type that `addEventListener` filters on; `retry:` tells the
+browser how long to wait before reconnecting.
+-->
+
+---
+
 # OpenAPI describes every endpoint
 
 > One JSON document: every path, parameter, and response; clients, docs, and tests are generated from it
@@ -665,6 +732,7 @@ part. Feed this URL to any OpenAPI generator and you have a client.
 - `webSocket("/greet") { incoming }` → one connection, many frames
 - `receiveDeserialized<T>()`, `sendSerialized(…)` → typed frames
 - `ClosedReceiveChannelException` → the client left; `close(…)` to leave
+- `sse("/…") { send(ServerSentEvent(…)) }` → one way, plain HTTP, `EventSource`
 - `/** Path: … Response: … */` → the compiler extension reads comments
 - `.describe { }`, `.hide()`, `swaggerUI` → the last word; two routes publish it
 

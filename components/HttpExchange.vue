@@ -15,10 +15,10 @@ defineProps({
   >
     <svg class="http-exchange__wires" viewBox="0 0 1056 320" preserveAspectRatio="none" aria-hidden="true">
       <defs>
-        <marker id="http-exchange-request-head" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7" markerHeight="7" orient="auto" markerUnits="userSpaceOnUse">
+        <marker id="http-exchange-request-head" viewBox="0 0 12 12" refX="8" refY="6" markerWidth="16" markerHeight="16" orient="auto" markerUnits="userSpaceOnUse">
           <path d="M1 1 L11 6 L1 11 Z" fill="#7954f6" />
         </marker>
-        <marker id="http-exchange-response-head" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="7" markerHeight="7" orient="auto" markerUnits="userSpaceOnUse">
+        <marker id="http-exchange-response-head" viewBox="0 0 12 12" refX="8" refY="6" markerWidth="16" markerHeight="16" orient="auto" markerUnits="userSpaceOnUse">
           <path d="M1 1 L11 6 L1 11 Z" fill="#eb55e6" />
         </marker>
       </defs>

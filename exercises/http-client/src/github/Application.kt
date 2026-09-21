@@ -4,7 +4,7 @@ import io.ktor.client.HttpClient
 import io.ktor.server.application.Application
 
 /**
- * Exercise 5 / 5: the DI plug-in provides the service.
+ * Exercise 4 / 4: the DI plug-in provides the service.
  *
  * `module` registers `GitHubHttp(client)` as the `GitHubService` with
  * `dependencies { provide<GitHubService> { ... } }` and then calls [routes].

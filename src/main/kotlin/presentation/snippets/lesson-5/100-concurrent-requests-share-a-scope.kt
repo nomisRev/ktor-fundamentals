@@ -5,7 +5,7 @@ package presentation.snippets.lesson5.slide100
 
 import presentation.support.*
 import io.ktor.client.call.body
-import io.ktor.client.plugins.resources.get
+import io.ktor.client.request.get
 import io.ktor.server.response.respond
 import io.ktor.server.routing.RoutingContext
 import kotlinx.coroutines.async
@@ -14,10 +14,9 @@ import kotlinx.coroutines.coroutineScope
 
 suspend fun RoutingContext.github(user: String) = coroutineScope {
   client().use { client ->
-    val resource = GitHub.User(user)
     val (info, repos) = awaitAll(
-      async { client.get(resource) },
-      async { client.get(GitHub.User.Repos(resource)) },
+      async { client.get("/users/$user") },
+      async { client.get("/users/$user/repos") },
     )
     call.respond(Profile(info.body<User>(), repos.body<List<Repo>>()))
   }

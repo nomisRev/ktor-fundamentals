@@ -20,11 +20,11 @@ fun jwtAuth(secret: String): SimpleAuthenticationScheme<UserIdPrincipal> = TODO(
 /**
  * Exercise 4 / 7: issue a token, verify it.
  *
- * `jwtModule` installs `ContentNegotiation` (`json()`) and `Resources`.
+ * `jwtModule` installs `ContentNegotiation` (`json()`).
  * `post("/login")` inside `authenticateWith(basicAuth) { }` signs a token
  * with `JWT.create()`, the claim `username` (`call.principal.name`), an
  * expiry one minute from now and `Algorithm.HMAC256(secret)`, and responds
- * with `mapOf("token" to token)`. `get<Greeting.Hello>` inside
+ * with `mapOf("token" to token)`. `get("/greet/{name}/hello/{hour}")` inside
  * `authenticateWith(jwtAuth(secret)) { }` responds with the text `Hello, ada`,
  * the principal's name.
  */

@@ -6,7 +6,6 @@ package presentation.snippets.lesson4.slide74
 import presentation.support.*
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.RoutingContext
-import io.ktor.server.sessions.clear
 import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
@@ -15,17 +14,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class GreetingTracker(val greetings: Set<String>)
 
-suspend fun RoutingContext.hello(req: Greeting.Hello) {
+suspend fun RoutingContext.hello(name: String) {
   val previous = call.sessions.get<GreetingTracker>()?.greetings.orEmpty()
   call.sessions.set(GreetingTracker(previous + "hello"))
   if ("bye" in previous) {
-    call.respondText("I thought you were gone, ${req.parent.name}")
+    call.respondText("I thought you were gone, $name")
   } else {
-    call.respondText("Hello, ${req.parent.name}")
+    call.respondText("Hello, $name")
   }
-}
-
-suspend fun RoutingContext.bye(req: Greeting.Bye) {
-  call.sessions.clear<GreetingTracker>()
-  call.respondText("Bye, ${req.parent.name}")
 }

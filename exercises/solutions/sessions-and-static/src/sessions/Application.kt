@@ -4,9 +4,9 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.http.content.staticResources
 import io.ktor.server.plugins.cors.routing.CORS
-import io.ktor.server.resources.Resources
-import io.ktor.server.resources.get
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 
 fun Route.assets() {
@@ -22,10 +22,11 @@ fun Application.cors() {
 fun Application.module() {
   sessions()
   cors()
-  install(Resources)
   routing {
     assets()
-    get<Greeting.Hello> { hello(it) }
-    get<Greeting.Bye> { bye(it) }
+    route("/greet/{name}") {
+      get("hello") { hello() }
+      get("bye") { bye() }
+    }
   }
 }

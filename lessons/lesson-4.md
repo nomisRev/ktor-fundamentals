@@ -118,13 +118,13 @@ import kotlinx.serialization.Serializable
 data class GreetingTracker(val greetings: Set<String>)
 
 // Example
-suspend fun RoutingContext.hello(req: Greeting.Hello) {
+suspend fun RoutingContext.hello(name: String) {
   val previous = call.sessions.get<GreetingTracker>()?.greetings.orEmpty()
   call.sessions.set(GreetingTracker(previous + "hello"))
   if ("bye" in previous) {
-    call.respondText("I thought you were gone, ${req.parent.name}")
+    call.respondText("I thought you were gone, $name")
   } else {
-    call.respondText("Hello, ${req.parent.name}")
+    call.respondText("Hello, $name")
   }
 }
 ```
@@ -156,19 +156,19 @@ import kotlinx.serialization.Serializable
 data class GreetingTracker(val greetings: Set<String>)
 
 // Example
-suspend fun RoutingContext.hello(req: Greeting.Hello) {
+suspend fun RoutingContext.hello(name: String) {
   val previous = call.sessions.get<GreetingTracker>()?.greetings.orEmpty()
   call.sessions.set(GreetingTracker(previous + "hello"))
   if ("bye" in previous) {
-    call.respondText("I thought you were gone, ${req.parent.name}")
+    call.respondText("I thought you were gone, $name")
   } else {
-    call.respondText("Hello, ${req.parent.name}")
+    call.respondText("Hello, $name")
   }
 }
 
-suspend fun RoutingContext.bye(req: Greeting.Bye) {
+suspend fun RoutingContext.bye(name: String) {
   call.sessions.clear<GreetingTracker>()
-  call.respondText("Bye, ${req.parent.name}")
+  call.respondText("Bye, $name")
 }
 ```
 

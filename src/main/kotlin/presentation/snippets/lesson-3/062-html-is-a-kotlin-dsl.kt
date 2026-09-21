@@ -8,13 +8,13 @@ import io.ktor.server.html.respondHtml
 import io.ktor.server.routing.RoutingContext
 import kotlinx.html.*
 
-suspend fun RoutingContext.hello(req: Greeting.Hello) {
+suspend fun RoutingContext.hello(name: String) {
   call.respondHtml {
     head {
       title { +"World Greeting Service" }
     }
     body {
-      h1 { +"Hello, ${req.parent.name}!" }
+      h1 { +"Hello, $name!" }
     }
   }
 }

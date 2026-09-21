@@ -262,6 +262,43 @@ fluently.
 -->
 
 ---
+magic-move
+---
+
+# Development mode is a key too
+
+<DrawnAnnotation text="development: true" label="Or `-Dio.ktor.development=true`: the `500` page shows the stack trace, classes reload" :geometry="{ label: { x: 0.625, y: 0.242, width: 0.65 } }" />
+<DrawnAnnotation text="watch:" label="Which paths to watch; with `./gradlew -t build` beside it, a change is live" :geometry="{ label: { x: 0.57, y: 0.41, width: 0.7 } }" />
+
+```yaml
+ktor:
+  development: true
+  deployment:
+    port: "$PORT:8080"
+    watch:
+      - classes
+  application:
+    modules:
+      - com.example.ApplicationKt.module
+
+github:
+  token: "$GITHUB_TOKEN"
+```
+
+<!--
+Two things change in development mode. An exception in a handler
+answers with the stack trace in the body instead of an empty `500`,
+which is what you want on a laptop and never in production. And the
+engine watches the paths under `watch` for changed class files and
+reloads the application without restarting the JVM, so with Gradle's
+continuous build running next to the server a saved file is a live
+route a few seconds later. The IDE sets the system property in the run
+configuration; `start.ktor.io` projects have it in the Gradle
+`application` block. The key is read at start-up, so leave it out of
+the file that ships and set the property instead.
+-->
+
+---
 
 # The module reads its own keys
 
@@ -539,6 +576,98 @@ sees `jwt.secret`.
 
 ---
 
+# A proxy terminates TLS
+
+<DrawnAnnotation text="X-Forwarded-For: 203.0.113.9" label="Added by the proxy: who really called, and over which scheme" :geometry="{ label: { x: 0.675, y: 0.242, width: 0.55 } }" />
+<DrawnAnnotation text="install(XForwardedHeaders)" label="Only behind your own proxy: a client can send these headers too" color="red" :geometry="{ label: { x: 0.69, y: 0.42, width: 0.58 } }" />
+<DrawnAnnotation text="call.request.origin" label="The client as the proxy saw it; `call.request.local` is the proxy" :geometry="{ label: { x: 0.74, y: 0.514, width: 0.48 } }" />
+
+```http
+GET /whoami HTTP/1.1
+X-Forwarded-For: 203.0.113.9
+X-Forwarded-Proto: https
+```
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
+import io.ktor.server.plugins.origin
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+
+fun Application.module() {
+  install(XForwardedHeaders)
+  routing {
+    get("/whoami") {
+      val origin = call.request.origin
+      call.respondText("${origin.remoteHost} over ${origin.scheme}")
+    }
+  }
+}
+```
+
+<!--
+Lesson 8 said "only over TLS" four times and never showed a certificate:
+in a container the certificate is the platform's problem. The ingress,
+the load balancer or nginx terminates TLS and forwards plain HTTP to
+`8080`, so without this plug-in every request looks like it came from
+the proxy over `http`. `ktor-server-forwarded-header` has two plug-ins:
+`XForwardedHeaders` reads the de facto headers,
+`ForwardedHeaders` the RFC 7239 one, `useFirstProxy()` and friends pick
+the right hop when there are several. `HttpsRedirect` and `HSTS` decide
+on `origin.scheme`, so they only work with this installed first. For
+the rare server that terminates TLS itself, `sslConnector { }` with a
+key store, or `ktor.security.ssl` in the file, is the other half.
+-->
+
+---
+
+# The server stops in two phases
+
+<DrawnAnnotation text="monitor.subscribe(ApplicationStopping)" label="On `SIGTERM`, before connections close: flush a queue, tell the balancer" :geometry="{ label: { x: 0.575, y: 0.336, width: 0.75 } }" />
+<DrawnAnnotation text="shutdownGracePeriod = 5000" label="No new connections; requests in flight may finish" :geometry="{ label: { x: 0.695, y: 0.562, width: 0.55 } }" />
+<DrawnAnnotation text="shutdownTimeout = 10000" label="Then the engine stops waiting" :geometry="{ label: { x: 0.65, y: 0.61, width: 0.5 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStarted
+import io.ktor.server.application.ApplicationStopping
+import io.ktor.server.application.log
+
+fun Application.module() {
+  monitor.subscribe(ApplicationStarted) { log.info("Ready") }
+  monitor.subscribe(ApplicationStopping) { log.info("Draining requests") }
+  routes()
+}
+```
+
+```text
+ktor {
+  deployment {
+    shutdownGracePeriod = 5000
+    shutdownTimeout = 10000
+  }
+}
+```
+
+<!--
+`docker stop` and a Kubernetes rollout send `SIGTERM` and wait, ten
+seconds by default, before they kill. Ktor answers in two phases: the
+grace period, during which no new connection is accepted and the
+requests in flight run to completion, and the time-out after which the
+remaining ones are cancelled, which is the `CancellationException`
+lesson 6's WebSocket handler caught. `monitor` is the application's
+event bus: `ApplicationStarted`, `ApplicationStopPreparing`,
+`ApplicationStopping`, `ApplicationStopped`; lesson 5's DI plug-in
+closes its `AutoCloseable`s on the last one. From code,
+`server.stop(gracePeriodMillis, timeoutMillis)` does the same as the
+two keys.
+-->
+
+---
+
 # One application, three packages
 
 | A container     | `./gradlew buildImage`: a JRE and the fat JAR in one image, for any cloud       |
@@ -753,6 +882,7 @@ into `webapps`, and the container does the rest.
 - `EngineMain` + `application.conf` / `application.yaml` → a file
 - `property("…")`, `${?PORT}` → keys from the environment
 - `loadConfigOrThrow<Config>()` → Hoplite, your own type
+- `XForwardedHeaders`, `ApplicationStopping`, `shutdownGracePeriod` → a proxy in front, a clean stop
 - `io.ktor.plugin` → `buildImage`, `runDocker`; `war` → a servlet container
 
 > **Configuration comes from outside the JAR.**

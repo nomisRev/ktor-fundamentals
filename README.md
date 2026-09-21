@@ -47,8 +47,8 @@ session, start Slidev with `--remote=your-password` instead.
 `slidev-kotlin-snippets` (shipped by `slidev-theme-kotlin`) generates one
 Kotlin file per Kotlin fence in `lessons/*.md` under
 `src/main/kotlin/presentation/snippets/`, with the fence's own imports plus
-`presentation.support.*`, the hand-written package holding the resources,
-DTOs and services the slides use without defining them. The generated files
+`presentation.support.*`, the hand-written package holding the DTOs,
+services and schemes the slides use without defining them. The generated files
 are committed and compile against the same Kotlin 2.4 / Ktor 3.6.0 API the
 deck advertises.
 
@@ -79,8 +79,8 @@ module's source file states the task. The bullets that are not code
 Prometheus) are steps in the module's `README.md`.
 
 Where the body is the lesson, the function is there with a `= TODO()` body.
-Where writing the declaration is the lesson (a `@Serializable` DTO, a
-`@Resource` class, the `GitHub` resources), the KDoc describes the shape and
+Where writing the declaration is the lesson (a `@Serializable` DTO, the
+`GitHubService` interface), the KDoc describes the shape and
 the class is not there yet: the module's tests do not compile until it is, so
 the first step of such an exercise is to make the tests compile, the second to
 make them pass. Modules are kept apart for that reason: an unfinished module

@@ -256,20 +256,22 @@ it depends on how the directory is laid out.
 # `authenticateWith` takes the scheme, not its name
 
 <DrawnAnnotation text="authenticateWith(basicAuth)" label="The value from the top of the file; every route inside is challenged first" :geometry="{ label: { x: 0.72, y: 0.289, width: 0.42 } }" />
-<DrawnAnnotation text="get<Greeting.Hello>" label="Routes outside the block stay public" :geometry="{ label: { x: 0.74, y: 0.42, width: 0.36 } }" />
+<DrawnAnnotation text="get(&quot;/greet/{name}/hello&quot;)" label="Routes outside the block stay public" :geometry="{ label: { x: 0.74, y: 0.42, width: 0.36 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticateWith
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
+import io.ktor.server.util.getValue
 
 fun Application.routes() {
   routing {
     authenticateWith(basicAuth) {
-      get<Greeting.Hello> { req ->
-        call.respondText("Hello, ${req.parent.name}")
+      get("/greet/{name}/hello") {
+        val name: String by call.pathParameters
+        call.respondText("Hello, $name")
       }
     }
   }
@@ -299,14 +301,14 @@ import io.ktor.server.application.Application
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticateWith
 import io.ktor.server.auth.principal
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
 
 fun Application.routes() {
   routing {
     authenticateWith(basicAuth) {
-      get<Greeting.Hello> { req ->
+      get("/greet/{name}/hello") {
         val user: UserIdPrincipal = call.principal
         call.respondText("Hello, ${user.name}")
       }
@@ -337,13 +339,13 @@ proved to be.
 import io.ktor.server.application.Application
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.principal
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
 
 fun Application.routes() {
   routing {
-    get<Greeting.Hello> { req ->
+    get("/greet/{name}/hello") {
       val user: UserIdPrincipal = call.principal
       call.respondText("Hello, ${user.name}")
     }
@@ -374,16 +376,18 @@ import io.ktor.server.application.Application
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticateWithOptional
 import io.ktor.server.auth.principalOrNull
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
+import io.ktor.server.util.getValue
 
 fun Application.routes() {
   routing {
     authenticateWithOptional(basicAuth) {
-      get<Greeting.Hello> { req ->
+      get("/greet/{name}/hello") {
+        val name: String by call.pathParameters
         val user: UserIdPrincipal? = call.principalOrNull
-        call.respondText("Hello, ${user?.name ?: req.parent.name}")
+        call.respondText("Hello, ${user?.name ?: name}")
       }
     }
   }
@@ -411,14 +415,14 @@ import io.ktor.server.application.Application
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticateWithAnyOf
 import io.ktor.server.auth.principal
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
 
 fun Application.routes() {
   routing {
     authenticateWithAnyOf<UserIdPrincipal>(basicAuth, formAuth) {
-      get<Greeting.Hello> { req ->
+      get("/greet/{name}/hello") {
         call.respondText("Hello, ${call.principal.name}")
       }
     }
@@ -667,14 +671,14 @@ import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticateWith
 import io.ktor.server.auth.principal
 import io.ktor.server.auth.session
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
 
 fun Application.routes() {
   routing {
     authenticateWith(sessionAuth) {
-      get<Greeting.Hello> { req ->
+      get("/greet/{name}/hello") {
         val user: UserIdPrincipal = call.principal
         call.respondText("Hello, ${user.name} in ${call.session.timezone}")
       }
@@ -708,7 +712,7 @@ import io.ktor.server.auth.authenticateWith
 import io.ktor.server.auth.clearSession
 import io.ktor.server.auth.principal
 import io.ktor.server.auth.session
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
@@ -716,7 +720,7 @@ import io.ktor.server.routing.routing
 fun Application.routes() {
   routing {
     authenticateWith(sessionAuth) {
-      get<Greeting.Hello> { req ->
+      get("/greet/{name}/hello") {
         val user: UserIdPrincipal = call.principal
         call.respondText("Hello, ${user.name} in ${call.session.timezone}")
       }
@@ -1046,14 +1050,14 @@ lesson 7 could render the `401` instead, for a uniform error format.
 import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticateWith
 import io.ktor.server.auth.principal
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
 
 fun Application.routes() {
   routing {
     authenticateWith(jwtAuth) {
-      get<Greeting.Hello> { req ->
+      get("/greet/{name}/hello") {
         call.respondText("Hello, ${call.principal.name}")
       }
     }
@@ -1112,14 +1116,14 @@ import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticateWith
 import io.ktor.server.auth.principal
 import io.ktor.server.auth.roles
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
 
 fun Application.routes() {
   routing {
     authenticateWith(roleAuth, roles = setOf(Role.Admin)) {
-      get<Greeting.Hello> { req ->
+      get("/greet/{name}/hello") {
         val roles: Set<Role> = call.principal.roles
         call.respondText("Hello, ${call.principal.name}: $roles")
       }
@@ -1136,6 +1140,53 @@ identified, `403` when they were identified and are not allowed, and
 without requiring any, for a handler that shows an admin view to some
 and a user view to the rest. A plain `authenticateWith(jwtAuth)` block
 has no `roles` property at all: it does not compile.
+-->
+
+---
+
+# Too many logins is a `429`
+
+> The login route is where passwords get guessed
+
+<DrawnAnnotation text="install(RateLimit)" label="`ktor-server-rate-limit`: a token bucket per key, the caller's address by default" :geometry="{ label: { x: 0.76, y: 0.352, width: 0.44 } }" />
+<DrawnAnnotation text="rateLimiter(limit = 5, refillPeriod = 1.minutes)" label="Five attempts a minute; the sixth is `429 Too Many Requests` with `Retry-After`" :geometry="{ label: { x: 0.575, y: 0.52, width: 0.75 } }" />
+<DrawnAnnotation text="rateLimit(RateLimitName(&quot;login&quot;))" label="A route node like `authenticateWith`: only the routes inside count" :geometry="{ label: { x: 0.73, y: 0.634, width: 0.46 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.ratelimit.RateLimit
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
+import io.ktor.server.routing.post
+import io.ktor.server.routing.routing
+import kotlin.time.Duration.Companion.minutes
+
+fun Application.module() {
+  install(RateLimit) {
+    register(RateLimitName("login")) {
+      rateLimiter(limit = 5, refillPeriod = 1.minutes)
+    }
+  }
+  routing {
+    rateLimit(RateLimitName("login")) {
+      post("/login") { issueToken() }
+    }
+  }
+}
+```
+
+<!--
+Authorization has a third answer next to `401` and `403`: not now. The
+plug-in keeps a bucket of tokens per key, takes one per request, and
+refills the bucket over the period; an empty bucket is a `429` with
+`Retry-After` and `X-RateLimit-Remaining` on every response before it.
+`requestKey { call -> … }` chooses the key, a user name instead of an
+address for the routes behind a scheme, Ktor 3.6 lets it read
+`call.principal`; `requestWeight` charges some calls more.
+`register { }` without a name is the global limit, `rateLimit { }`
+without one applies it. Lesson 5's client retry honours `Retry-After`,
+so the two halves agree.
 -->
 
 ---
@@ -1189,7 +1240,7 @@ import io.ktor.server.application.install
 import io.ktor.server.auth.authenticateWith
 import io.ktor.server.auth.oidc.Oidc
 import io.ktor.server.auth.principal
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
 
@@ -1201,7 +1252,7 @@ suspend fun Application.module() {
   }
   routing {
     authenticateWith(google.jwtBearer) {
-      get<Greeting.Hello> { req ->
+      get("/greet/{name}/hello") {
         call.respondText("Hello, ${call.principal.claims.subject}")
       }
     }
@@ -1292,14 +1343,14 @@ behind them is a `CookieId` in memory by default, `HttpOnly`,
 import io.ktor.server.application.Application
 import io.ktor.server.auth.authenticateWith
 import io.ktor.server.auth.principal
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
 
 fun Application.routes() {
   routing {
     authenticateWith(google.session) {
-      get<Greeting.Hello> { req ->
+      get("/greet/{name}/hello") {
         call.respondText("Hello, ${call.principal.userInfo.name}")
       }
     }
@@ -1333,7 +1384,7 @@ import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticateWith
 import io.ktor.server.auth.mapPrincipal
 import io.ktor.server.auth.principal
-import io.ktor.server.resources.get
+import io.ktor.server.routing.get
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.routing
 
@@ -1344,7 +1395,7 @@ val googleAuth = google.session.mapPrincipal { token ->
 fun Application.routes() {
   routing {
     authenticateWith(googleAuth) {
-      get<Greeting.Hello> { req ->
+      get("/greet/{name}/hello") {
         call.respondText("Hello, ${call.principal.name}")
       }
     }
@@ -1371,7 +1422,7 @@ Google and GitHub, mapped to the same type, meet in
 - `authenticateWith(scheme) { }` → the routes it protects; `call.principal`, never `null`
 - `session<S, P>` and `setSession` → a login that outlives its request
 - `jwt<P>` and `JWT.create() … .sign(…)` → a token instead of a session
-- `withRoles { }` and `roles = setOf(…)` → `403` per route
+- `withRoles { }` and `roles = setOf(…)` → `403` per route; `rateLimit(…)` → `429` per caller
 - `install(Oidc)` and `identityProvider { issuer }` → a provider vouches
 
 > **Authenticate once, authorize per route.**

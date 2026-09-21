@@ -7,8 +7,7 @@ import io.ktor.client.HttpClient
  *
  * `appTest` is `testApplication { }` with the set-up every test repeats:
  * `application { module() }` and a client from `createClient { }` with
- * `ContentNegotiation` (`json()`) and `Resources` installed, which it hands to
- * [test]. The tests in `GreetingTest` are then only the test.
+ * `ContentNegotiation` (`json()`) installed, which it hands to [test]. The tests in `GreetingTest` are then only the test.
  *
  * Exercise 3 / 5: generated input finds the corner cases.
  *

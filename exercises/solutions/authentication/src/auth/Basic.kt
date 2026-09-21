@@ -7,9 +7,8 @@ import io.ktor.server.auth.UserPasswordCredential
 import io.ktor.server.auth.authenticateWith
 import io.ktor.server.auth.basic
 import io.ktor.server.auth.principal
-import io.ktor.server.resources.Resources
-import io.ktor.server.resources.get
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 
 fun checkCredentials(credentials: UserPasswordCredential): UserIdPrincipal? =
@@ -22,10 +21,9 @@ val basicAuth = basic<UserIdPrincipal>("auth") {
 }
 
 fun Application.basicModule() {
-  install(Resources)
   routing {
     authenticateWith(basicAuth) {
-      get<Greeting.Hello> {
+      get("/greet/{name}/hello/{hour}") {
         call.respondText("Hello, ${call.principal.name}")
       }
     }

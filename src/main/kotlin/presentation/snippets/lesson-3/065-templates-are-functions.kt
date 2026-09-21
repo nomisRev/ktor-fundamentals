@@ -8,23 +8,23 @@ import io.ktor.server.html.respondHtml
 import io.ktor.server.routing.RoutingContext
 import kotlinx.html.*
 
-suspend fun RoutingContext.spell(req: Spell) {
-  call.respondHtml {
-    body {
-      h1 {
-        notEmpty(req.name, emptyMessage = "No name") {
-          +"${req.name.first().uppercaseChar()}"
-          req.name.drop(1).forEach { +" - ${it.uppercaseChar()}" }
-        }
-      }
-    }
-  }
-}
-
 fun FlowContent.notEmpty(
   value: String,
   emptyMessage: String,
   content: FlowContent.() -> Unit,
 ) {
   if (value.isEmpty()) +emptyMessage else content()
+}
+
+suspend fun RoutingContext.spell(name: String) {
+  call.respondHtml {
+    body {
+      h1 {
+        notEmpty(name, emptyMessage = "No name") {
+          +"${name.first().uppercaseChar()}"
+          name.drop(1).forEach { +" - ${it.uppercaseChar()}" }
+        }
+      }
+    }
+  }
 }

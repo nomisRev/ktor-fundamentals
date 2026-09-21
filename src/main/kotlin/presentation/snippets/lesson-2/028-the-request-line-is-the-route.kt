@@ -12,7 +12,9 @@ import io.ktor.server.routing.routing
 fun Application.module() {
   routing {
     get("/hello/{name}") {
-      call.respondText("Hello")
+      val name = call.parameters["name"]
+      val timezone = call.request.queryParameters["timezone"]
+      call.respondText("Hello, $name in $timezone")
     }
   }
 }

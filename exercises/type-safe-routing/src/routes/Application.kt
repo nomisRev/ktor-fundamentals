@@ -3,10 +3,11 @@ package routes
 import io.ktor.server.application.Application
 
 /**
- * Exercise 4 / 4: the plug-in does the matching.
+ * Exercise 2 / 4: routes group by prefix.
  *
- * `module` installs `Resources` and registers `get<Greeting.Bye> { bye(it) }`
- * and `get<Greeting.Hello> { hello(it) }` (`io.ktor.server.resources.get`).
- * No string route is left.
+ * `module` registers `route("/greet/{name}") { }` with `get("bye") { bye() }`
+ * and `get("hello/{hour}") { hello() }` inside it: the prefix and its `{name}`
+ * capture are written once, and every route in the group reads them through
+ * `call.pathParameters`.
  */
 fun Application.module(): Unit = TODO()
