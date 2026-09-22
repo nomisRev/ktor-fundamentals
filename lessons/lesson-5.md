@@ -18,9 +18,9 @@ kodee: wave
 
 > Plug-ins, serialization, coroutines: the server's tools, pointed the other way
 
-<DrawnAnnotation text="CIO" />
-<DrawnAnnotation text="ContentNegotiation" label="Same name as the server plug-in, different package: `io.ktor.client.plugins`" :geometry="{ label: { x: 0.76, y: 0.4, width: 0.36 } }" />
-<DrawnAnnotation text="ignoreUnknownKeys = true" label="GitHub sends more fields than we model" :geometry="{ label: { x: 0.76, y: 0.53, width: 0.36 } }" />
+<DrawnAnnotation text="CIO" label="HttpEngine; Many choices depending on platform" on="0" color="var(--fundamentals-blue)"  :geometry="{ label: { x: 0.6626, y: 0.3000 } }"/>
+<DrawnAnnotation text="ContentNegotiation" label="Same name as the server plug-in, different package: `io.ktor.client.plugins`" on="1" :geometry="{ label: { x: 0.7206, y: 0.4351, width: 0.3600 } }" />
+<DrawnAnnotation text="ignoreUnknownKeys = true" label="GitHub sends more fields than we model" color="var(--fundamentals-pink)" on="2" :geometry="{ label: { x: 0.3168, y: 0.5439, width: 0.3600 } }" />
 
 ```kotlin
 import io.ktor.client.HttpClient
@@ -53,7 +53,7 @@ magic-move
 
 > Plug-ins, serialization, coroutines: the server's tools, pointed the other way
 
-<DrawnAnnotation text="defaultRequest" label="Every request starts from the base URL; a request only adds the path" :geometry="{ label: { x: 0.74, y: 0.65, width: 0.4 } }" />
+<DrawnAnnotation text="defaultRequest" label="Every request starts from the base URL; a request only adds the path" :geometry="{ label: { x: 0.3965, y: 0.6941, width: 0.4000 } }" />
 
 ```kotlin
 import io.ktor.client.HttpClient
@@ -81,9 +81,6 @@ starting point of every request; the request block can still override it.
 
 # The schema is a `@Serializable` class
 
-<DrawnAnnotation text="@Serializable" label="The same annotation as the server's bodies: when both ends are yours, one module serves both" :geometry="{ label: { x: 0.72, y: 0.22, width: 0.4 } }" />
-<DrawnAnnotation text="val avatar_url: String?" label="GitHub's names, GitHub's nullability: `@SerialName` if you prefer `avatarUrl`" :geometry="{ label: { x: 0.74, y: 0.42, width: 0.4 } }" />
-
 ```kotlin
 import kotlinx.serialization.Serializable
 
@@ -91,7 +88,7 @@ import kotlinx.serialization.Serializable
 data class User(
   val name: String?,
   val bio: String?,
-  val avatar_url: String?,
+  @SerialName("avatar_url") val avatarUrl: String?,
 )
 
 @Serializable
@@ -99,33 +96,23 @@ data class Repo(
   val name: String,
   val description: String?,
   val fork: Boolean,
-  val stargazers_count: Int,
+  @SerialName("stargazers_count") val stargazersCount: Int,
 )
 ```
-
-<!--
-`api.github.com/users/{username}` returns the profile, `/users/{username}/repos`
-the repositories. When both ends are yours, the `@Serializable` DTOs live
-in one Gradle module that server and client depend on: a changed field
-fails compilation on both sides. Here the other end is GitHub, so the DTOs
-only describe the part of the payload we read.
--->
 
 ---
 
 # A request is a verb and a URL
 
-<DrawnAnnotation text="client().use { client ->" label="One client per request, closed by `use`; a shared one comes with services" :geometry="{ label: { x: 0.79, y: 0.22, width: 0.3 } }" />
-<DrawnAnnotation text="client.get(&quot;/users/$user&quot;)" label="The verb is the function, the path completes `defaultRequest`: `GET /users/alex`" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
+<DrawnAnnotation text="HttpClient" />
+<DrawnAnnotation text="get(&quot;/users/$user&quot;)" label="The verb is the function, the path completes `defaultRequest`: `GET /users/alex`" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
 
 ```kotlin
 import io.ktor.client.request.get
 import io.ktor.server.routing.RoutingContext
 
-suspend fun RoutingContext.github(user: String) {
-  client().use { client ->
-    val response = client.get("/users/$user")
-  }
+suspend fun HttpClient.github(user: String) {
+    val response = get("/users/$user")
 }
 ```
 
@@ -142,8 +129,8 @@ magic-move
 
 # A request is a verb and a URL
 
-<DrawnAnnotation text="response.status" label="`HttpResponse`: status, headers, and a body still on the wire" :geometry="{ label: { x: 0.76, y: 0.34, width: 0.36 } }" />
-<DrawnAnnotation text="response.body<User>()" label="Deserialized by `ContentNegotiation`, the mirror of `call.receive`" :geometry="{ label: { x: 0.78, y: 0.49, width: 0.32 } }" />
+<DrawnAnnotation text="response.status" label="`HttpResponse`: status, headers, and a body still on the wire" color="var(--fundamentals-blue)" :geometry="{ label: { x: 0.6284, y: 0.2710, width: 0.3600 } }" />
+<DrawnAnnotation text="response.body<User>()" label="Deserialized by `ContentNegotiation`, the mirror of `call.receive`" :geometry="{ label: { x: 0.5178, y: 0.4298, width: 0.4671 } }" />
 
 ```kotlin
 import io.ktor.client.call.body
@@ -152,13 +139,11 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
 import io.ktor.server.routing.RoutingContext
 
-suspend fun RoutingContext.github(user: String) {
-  client().use { client ->
-    val response = client.get("/users/$user")
-    when (response.status) {
-      HttpStatusCode.OK -> call.respond(response.body<User>())
-      else -> call.respond(HttpStatusCode.NotFound)
-    }
+suspend fun HttpClient.github(user: String) {
+  val response = get("/users/$user")
+  when (response.status) {
+    HttpStatusCode.OK -> response.body<User>()
+    else -> TODO()
   }
 }
 ```
@@ -173,9 +158,9 @@ string. Both consume the body, so read it once. `response.headers`,
 
 # The request block carries the body
 
-<DrawnAnnotation text="client.post(&quot;/repos/$owner/$repo&quot;) {" label="Same URL style, other verb; the block adds headers, query, body" :geometry="{ label: { x: 0.76, y: 0.29, width: 0.36 } }" />
+<DrawnAnnotation text="client.post(&quot;/repos/$owner/$repo&quot;) {" label="Same URL style, other verb; the block adds headers, query, body" :geometry="{ label: { x: 0.7408, y: 0.2670, width: 0.3600 } }" />
 <DrawnAnnotation text="contentType(" />
-<DrawnAnnotation text="setBody(" label="Serialized by the same `ContentNegotiation`; `contentType` says as what" :geometry="{ label: { x: 0.76, y: 0.45, width: 0.36 } }" />
+<DrawnAnnotation text="setBody(" label="Serialized by the same `ContentNegotiation`; `contentType` says as what" :geometry="{ label: { x: 0.4475, y: 0.4093, width: 0.5468 } }" />
 
 ```kotlin
 import io.ktor.client.request.post
@@ -186,14 +171,11 @@ import io.ktor.http.contentType
 import io.ktor.server.response.respond
 import io.ktor.server.routing.RoutingContext
 
-suspend fun RoutingContext.describe(owner: String, repo: String, text: String) {
-  client().use { client ->
+suspend fun HttpClient.describe(owner: String, repo: String, text: String) {
     client.post("/repos/$owner/$repo") {
       contentType(ContentType.Application.Json)
       setBody(mapOf("description" to text))
     }
-    call.respond(HttpStatusCode.NoContent)
-  }
 }
 ```
 
@@ -223,8 +205,8 @@ public suspend inline fun HttpClient.get(
 import io.ktor.client.request.get
 import io.ktor.server.routing.RoutingContext
 
-suspend fun RoutingContext.github(user: String) {
-  client().use { client -> client.get("/users/$user") }
+suspend fun HttpClient.github(user: String) {
+  get("/users/$user")
 }
 ```
 
@@ -242,8 +224,8 @@ coroutine while the bytes travel and resumes it on any free thread.
 
 > Not everything suspends: JDBC, `java.io`, a legacy SDK
 
-<DrawnAnnotation text="File(&quot;uploads/$name.png&quot;).readBytes()" label="Blocks its thread until the disk answers" color="red" :geometry="{ label: { x: 0.775, y: 0.4, width: 0.43 } }" />
-<DrawnAnnotation text="withContext(Dispatchers.IO)" label="A pool for blocking; the handler suspends" :geometry="{ label: { x: 0.775, y: 0.352, width: 0.43 } }" />
+<DrawnAnnotation text="File(&quot;uploads/$name.png&quot;).readBytes()" label="Blocks its thread until the disk answers" color="red" :geometry="{ label: { x: 0.6776, y: 0.4587, width: 0.4300 } }" />
+<DrawnAnnotation text="withContext(Dispatchers.IO)" label="A pool for blocking; the handler suspends" :geometry="{ label: { x: 0.7310, y: 0.3608, width: 0.4300 } }" />
 
 ```kotlin
 import io.ktor.http.ContentType
@@ -277,8 +259,7 @@ R2DBC driver, does not need the switch.
 
 # Concurrent requests share a scope
 
-<DrawnAnnotation text="coroutineScope {" label="`async` needs a scope: nothing outlives the handler" :geometry="{ label: { x: 0.8, y: 0.3, width: 0.28 } }" />
-<DrawnAnnotation text="async { client.get(&quot;/users/$user&quot;) }.await()" label="Started, then awaited at once: the second request only begins after the first" color="red" :geometry="{ label: { x: 0.72, y: 0.6, width: 0.44 } }" />
+<DrawnAnnotation text="coroutineScope {" label="`async` needs a scope: nothing outlives the handler" :geometry="{ label: { x: 0.6260, y: 0.4853, width: 0.2800 } }" />
 
 ```kotlin
 import io.ktor.client.call.body
@@ -288,12 +269,10 @@ import io.ktor.server.routing.RoutingContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
-suspend fun RoutingContext.github(user: String) = coroutineScope {
-  client().use { client ->
-    val info = async { client.get("/users/$user") }.await()
-    val repos = async { client.get("/users/$user/repos") }.await()
-    call.respond(Profile(info.body<User>(), repos.body<List<Repo>>()))
-  }
+suspend fun HttpClient.github(user: String) = coroutineScope {
+    val info = async { client.get("/users/$user").body<User>() }
+    val repos = async { client.get("/users/$user/repos").body<List<Repo>>() } 
+    call.respond(Profile(info.await(), repos.await()))
 }
 ```
 
@@ -306,49 +285,13 @@ handler fails.
 -->
 
 ---
-magic-move
----
-
-# Concurrent requests share a scope
-
-<DrawnAnnotation text="awaitAll(" label="Both in flight; waits for both, and cancels the other if one fails" :geometry="{ label: { x: 0.74, y: 0.34, width: 0.4 } }" />
-<DrawnAnnotation text="async {" label="A lightweight task in the handler's scope, not a thread" :geometry="{ label: { x: 0.74, y: 0.66, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.client.call.body
-import io.ktor.client.request.get
-import io.ktor.server.response.respond
-import io.ktor.server.routing.RoutingContext
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-
-suspend fun RoutingContext.github(user: String) = coroutineScope {
-  client().use { client ->
-    val (info, repos) = awaitAll(
-      async { client.get("/users/$user") },
-      async { client.get("/users/$user/repos") },
-    )
-    call.respond(Profile(info.body<User>(), repos.body<List<Repo>>()))
-  }
-}
-```
-
-<!--
-Two `await` calls in a row would also work, since both tasks are already
-running; `awaitAll` says the intent and fails fast: the first exception
-cancels the rest instead of waiting for it. A shared client serves both
-requests from one connection pool.
--->
-
----
 
 # Retries are a client plug-in
 
 > The other side is down, or overloaded, or waking up
 
-<DrawnAnnotation text="retryOnServerErrors(maxRetries = 5)" label="5xx only: a `404` will not change its mind, an exception does not count" :geometry="{ label: { x: 0.74, y: 0.64, width: 0.4 } }" />
-<DrawnAnnotation text="constantDelay(millis = 1000)" label="A second between attempts, plus up to a second of jitter" :geometry="{ label: { x: 0.76, y: 0.75, width: 0.36 } }" />
+<DrawnAnnotation text="retryOnServerErrors(maxRetries = 5)" label="5xx only: a `404` will not change its mind, an exception does not count" :geometry="{ label: { x: 0.6509, y: 0.6131, width: 0.4000 } }" />
+<DrawnAnnotation text="constantDelay(millis = 1000)" label="A second between attempts, plus up to a second of jitter" :geometry="{ label: { x: 0.3520, y: 0.7210, width: 0.3600 } }" />
 
 ```kotlin
 import io.ktor.client.HttpClient
@@ -386,7 +329,7 @@ magic-move
 
 > Retry is simple; circuit breakers live in libraries
 
-<DrawnAnnotation text="exponentialDelay()" label="1 s, 2 s, 4 s, 8 s: room for a server that is waking up; honours `Retry-After`" :geometry="{ label: { x: 0.72, y: 0.75, width: 0.44 } }" />
+<DrawnAnnotation text="exponentialDelay()" label="1 s, 2 s, 4 s, 8 s: room for a server that is waking up; honours `Retry-After`" :geometry="{ label: { x: 0.4376, y: 0.7191, width: 0.4400 } }" />
 
 ```kotlin
 import io.ktor.client.HttpClient
@@ -427,8 +370,8 @@ magic-move
 
 > Without one, a silent server holds the request forever
 
-<DrawnAnnotation text="install(HttpTimeout)" label="`ktor-client-core`; expiry is an exception, which `retryOnException` may retry" :geometry="{ label: { x: 0.7, y: 0.728, width: 0.5 } }" />
-<DrawnAnnotation text="requestTimeoutMillis = 5_000" label="Whole exchange; `connectTimeoutMillis` and `socketTimeoutMillis` for the parts" :geometry="{ label: { x: 0.55, y: 0.822, width: 0.8 } }" />
+<DrawnAnnotation text="install(HttpTimeout)" label="`ktor-client-core`; expiry is an exception, which `retryOnException` may retry" :geometry="{ label: { x: 0.6070, y: 0.7654, width: 0.5000 } }" />
+<DrawnAnnotation text="requestTimeoutMillis = 5_000" label="Whole exchange; `connectTimeoutMillis` and `socketTimeoutMillis` for the parts" :geometry="{ label: { x: 0.4988, y: 0.8572, width: 0.8000 } }" />
 
 ```kotlin
 import io.ktor.client.HttpClient

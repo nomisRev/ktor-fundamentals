@@ -60,51 +60,11 @@ class is the cookie value.
 -->
 
 ---
-magic-move
----
-
-# A session is a registered class
-
-<DrawnAnnotation text="header<SecretInfo>" label="A header: for clients that are not browsers" :geometry="{ label: { x: 0.52, y: 0.72, width: 0.36 } }" />
-<DrawnAnnotation text="SessionStorageMemory()" label="Server-side: the client only receives an identifier" :geometry="{ label: { x: 0.62, y: 0.83, width: 0.44 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.sessions.SessionStorageMemory
-import io.ktor.server.sessions.Sessions
-import io.ktor.server.sessions.cookie
-import io.ktor.server.sessions.header
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class GreetingTracker(val greetings: Set<String>)
-
-@Serializable
-data class SecretInfo(val secret: String)
-
-fun Application.module() {
-  install(Sessions) {
-    cookie<GreetingTracker>("track")
-    header<SecretInfo>("secret", SessionStorageMemory())
-  }
-  routes()
-}
-```
-
-<!--
-Memory storage is per process: a restart or a second instance loses it.
-`directorySessionStorage(File("build/.sessions"))` writes to disk; a shared
-store such as Redis is a small interface away, `SessionStorage` has three
-functions.
--->
-
----
 
 # The handler reads and writes the session
 
-<DrawnAnnotation text="call.sessions.get<GreetingTracker>()" label="`null` on the first visit: there is no cookie yet" :geometry="{ label: { x: 0.8, y: 0.34, width: 0.32 } }" />
-<DrawnAnnotation text="call.sessions.set(" label="Serialized into the cookie of this response" :geometry="{ label: { x: 0.76, y: 0.43, width: 0.36 } }" />
+<DrawnAnnotation text="call.sessions.get<GreetingTracker>()" label="`null` on the first visit: there is no cookie yet" :geometry="{ label: { x: 0.7876, y: 0.3110, width: 0.3236 } }" />
+<DrawnAnnotation text="call.sessions.set(" label="Serialized into the cookie of this response" color="var(--fundamentals-blue)" on="1" :geometry="{ label: { x: 0.2991, y: 0.3425, width: 0.4734 } }" />
 
 ```kotlin
 import io.ktor.server.response.respondText
@@ -121,6 +81,7 @@ data class GreetingTracker(val greetings: Set<String>)
 suspend fun RoutingContext.hello(name: String) {
   val previous = call.sessions.get<GreetingTracker>()?.greetings.orEmpty()
   call.sessions.set(GreetingTracker(previous + "hello"))
+  
   if ("bye" in previous) {
     call.respondText("I thought you were gone, $name")
   } else {
@@ -141,7 +102,7 @@ magic-move
 
 # The handler reads and writes the session
 
-<DrawnAnnotation text="clear<GreetingTracker>()" label="Forget: the cookie is expired on this response" :geometry="{ label: { x: 0.74, y: 0.71, width: 0.36 } }" />
+<DrawnAnnotation text="clear<GreetingTracker>()" label="Forget: the cookie is expired on this response" :geometry="{ label: { x: 0.6060, y: 0.7485, width: 0.3600 } }" />
 
 ```kotlin
 import io.ktor.server.response.respondText
@@ -178,7 +139,7 @@ suspend fun RoutingContext.bye(name: String) {
 
 > Encrypted, only the server can read it. The client can still copy and replay it.
 
-<DrawnAnnotation text="cookie<GreetingTracker>(&quot;track&quot;)" label="Readable and editable by whoever holds the cookie" color="red" :geometry="{ label: { x: 0.74, y: 0.55, width: 0.4 } }" />
+<DrawnAnnotation text="cookie<GreetingTracker>(&quot;track&quot;)" label="Readable and editable by whoever holds the cookie" color="red" :geometry="{ label: { x: 0.5827, y: 0.6256, width: 0.4000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -211,8 +172,8 @@ magic-move
 
 # Session data is plain text by default
 
-<DrawnAnnotation text="SessionTransportTransformerEncrypt" label="AES plus an HMAC: encrypted and signed" :geometry="{ label: { x: 0.6, y: 0.77, width: 0.36 } }" />
-<DrawnAnnotation text="hex(" label="Keys come from configuration, never from source: lesson 9" :geometry="{ label: { x: 0.78, y: 0.29, width: 0.3 } }" />
+<DrawnAnnotation text="SessionTransportTransformerEncrypt" label="AES plus an HMAC: encrypted and signed" :geometry="{ label: { x: 0.4696, y: 0.7468, width: 0.3600 } }" />
+<DrawnAnnotation text="hex(" label="Keys come from configuration, never from source: lesson 9" :geometry="{ label: { x: 0.7494, y: 0.4038, width: 0.3000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -267,8 +228,8 @@ of the pipeline.
 
 # A folder is a route
 
-<DrawnAnnotation text="&quot;/assets&quot;" label="The URL prefix" :geometry="{ label: { x: 0.62, y: 0.29, width: 0.24 } }" />
-<DrawnAnnotation text="File(&quot;files&quot;)" label="The folder, relative to the working directory: `files/logo.png` is `/assets/logo.png`" :geometry="{ label: { x: 0.74, y: 0.39, width: 0.42 } }" />
+<DrawnAnnotation text="&quot;/assets&quot;" label="The URL prefix" :geometry="{ label: { x: 0.2649, y: 0.3583, width: 0.2400 } }" />
+<DrawnAnnotation text="File(&quot;files&quot;)" label="The folder, relative to the working directory: `files/logo.png` is `/assets/logo.png`" color="var(--fundamentals-blue)" :geometry="{ label: { x: 0.5773, y: 0.3687, width: 0.4200 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -294,9 +255,9 @@ magic-move
 
 # A folder is a route
 
-<DrawnAnnotation text="default(&quot;index.html&quot;)" label="Served for `/assets/` itself" :geometry="{ label: { x: 0.66, y: 0.34, width: 0.26 } }" />
-<DrawnAnnotation text="preCompressed(CompressedFileType.GZIP)" label="`logo.png.gz` beside `logo.png`, served when the client accepts it" :geometry="{ label: { x: 0.83, y: 0.43, width: 0.3 } }" />
-<DrawnAnnotation text="exclude" label="Never the dotfiles" :geometry="{ label: { x: 0.7, y: 0.56, width: 0.3 } }" />
+<DrawnAnnotation text="default(&quot;index.html&quot;)" label="Served for `/assets/` itself" :geometry="{ label: { x: 0.4822, y: 0.3333, width: 0.2600 } }" />
+<DrawnAnnotation text="preCompressed(CompressedFileType.GZIP)" label="`logo.png.gz` beside `logo.png`, served when the client accepts it" color="var(--fundamentals-blue)" :geometry="{ label: { x: 0.7948, y: 0.3919, width: 0.5008 } }" />
+<DrawnAnnotation text="exclude" label="Never the dotfiles" color="var(--fundamentals-pink)" :geometry="{ label: { x: 0.2433, y: 0.4950, width: 0.3000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -327,8 +288,8 @@ magic-move
 
 # A folder is a route
 
-<DrawnAnnotation text="staticResources(&quot;/assets&quot;, &quot;static&quot;)" label="From the classpath: `src/main/resources/static`, inside the jar" :geometry="{ label: { x: 0.74, y: 0.39, width: 0.4 } }" />
-<DrawnAnnotation text="staticFiles(&quot;/uploads&quot;, File(&quot;uploads&quot;))" label="From disk: what changes while the server runs" :geometry="{ label: { x: 0.76, y: 0.29, width: 0.36 } }" />
+<DrawnAnnotation text="staticResources(&quot;/assets&quot;, &quot;static&quot;)" label="From the classpath: `src/main/resources/static`, inside the jar" :geometry="{ label: { x: 0.6040, y: 0.3966, width: 0.4000 } }" />
+<DrawnAnnotation text="staticFiles(&quot;/uploads&quot;, File(&quot;uploads&quot;))" label="From disk: what changes while the server runs" color="var(--fundamentals-pink)" :geometry="{ label: { x: 0.6540, y: 0.2666, width: 0.3600 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -357,8 +318,8 @@ operator. `staticZip` serves the content of an archive the same way.
 
 > Every unknown path falls back to `index.html`: the router lives in the browser
 
-<DrawnAnnotation text="useResources = true" label="From the classpath instead of the file system" :geometry="{ label: { x: 0.68, y: 0.5, width: 0.36 } }" />
-<DrawnAnnotation text="react(&quot;app&quot;)" label="`app/index.html` and everything under it; `angular`, `vue`, `ember` too" :geometry="{ label: { x: 0.68, y: 0.6, width: 0.42 } }" />
+<DrawnAnnotation text="useResources = true" label="From the classpath instead of the file system" :geometry="{ label: { x: 0.4676, y: 0.5125, width: 0.3600 } }" />
+<DrawnAnnotation text="react(&quot;app&quot;)" label="`app/index.html` and everything under it; `angular`, `vue`, `ember` too" :geometry="{ label: { x: 0.2855, y: 0.6376, width: 0.4200 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -388,7 +349,7 @@ keeps build artefacts out.
 
 > The defaults are fine: gzip and deflate, negotiated, only where it pays off
 
-<DrawnAnnotation text="install(Compression)" label="Reads `Accept-Encoding`, writes `Content-Encoding`, skips images and small bodies" :geometry="{ label: { x: 0.7, y: 0.41, width: 0.44 } }" />
+<DrawnAnnotation text="install(Compression)" label="Reads `Accept-Encoding`, writes `Content-Encoding`, skips images and small bodies" :geometry="{ label: { x: 0.5380, y: 0.4273, width: 0.4400 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -413,7 +374,7 @@ fun Application.module() {
 
 > Front-end at `https://example.com`, API at `https://api.example.com`: two origins
 
-<DrawnAnnotation text="Origin: https://example.com" label="Added by the browser to every cross-origin request" :geometry="{ label: { x: 0.72, y: 0.46, width: 0.4 } }" />
+<DrawnAnnotation text="Origin: https://example.com" label="Added by the browser to every cross-origin request" :geometry="{ label: { x: 0.4987, y: 0.4466, width: 0.4000 } }" />
 
 ```http
 GET /greet/Alex HTTP/1.1
@@ -421,7 +382,7 @@ Host: api.example.com
 Origin: https://example.com
 ```
 
-<DrawnAnnotation text="Access-Control-Allow-Origin" label="Without it the browser hides the response from the page" :geometry="{ label: { x: 0.76, y: 0.63, width: 0.4 } }" />
+<DrawnAnnotation text="Access-Control-Allow-Origin" label="Without it the browser hides the response from the page" :geometry="{ label: { x: 0.3878, y: 0.6779, width: 0.4000 } }" />
 
 ```http
 HTTP/1.1 200 OK
@@ -439,7 +400,7 @@ headers in play.
 
 # CORS is opt-in, by the server
 
-<DrawnAnnotation text="anyHost()" label="Every origin: fine for a demo, not for production" color="red" :geometry="{ label: { x: 0.64, y: 0.29, width: 0.4 } }" />
+<DrawnAnnotation text="anyHost()" label="Every origin: fine for a demo, not for production" color="red" :geometry="{ label: { x: 0.3557, y: 0.3077, width: 0.4000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -466,8 +427,8 @@ magic-move
 
 # CORS is opt-in, by the server
 
-<DrawnAnnotation text="allowHost(" label="`https://example.com`, `www.` and `app.`; `*.example.com` also works" :geometry="{ label: { x: 0.72, y: 0.29, width: 0.42 } }" />
-<DrawnAnnotation text="schemes = listOf(&quot;https&quot;)" label="Say so explicitly: the default is `http` only" :geometry="{ label: { x: 0.74, y: 0.39, width: 0.36 } }" />
+<DrawnAnnotation text="allowHost(" label="`https://example.com`, `www.example.com` and `app.example.com`" :geometry="{ label: { x: 0.6174, y: 0.2923, width: 0.6677 } }" />
+<DrawnAnnotation text="schemes = listOf(&quot;https&quot;)" label="Say so explicitly: the default is `http` only" color="var(--fundamentals-pink)" :geometry="{ label: { x: 0.6107, y: 0.4129, width: 0.3600 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -492,9 +453,9 @@ magic-move
 
 # CORS is opt-in, by the server
 
-<DrawnAnnotation text="allowCredentials = true" label="Cookies and `Authorization` may travel" :geometry="{ label: { x: 0.74, y: 0.53, width: 0.36 } }" />
-<DrawnAnnotation text="allowNonSimpleContentTypes = true" label="`application/json` bodies are not simple" :geometry="{ label: { x: 0.76, y: 0.62, width: 0.36 } }" />
-<DrawnAnnotation text="allowHeadersPrefixed(&quot;X-Greet-&quot;)" label="Custom headers, by prefix" :geometry="{ label: { x: 0.74, y: 0.71, width: 0.3 } }" />
+<DrawnAnnotation text="allowCredentials = true" label="Cookies and `Authorization` may travel" :geometry="{ label: { x: 0.5561, y: 0.5326, width: 0.5262 } }" />
+<DrawnAnnotation text="allowNonSimpleContentTypes = true" label="`application/json` bodies are not simple" color="var(--fundamentals-pink)" :geometry="{ label: { x: 0.6675, y: 0.5829, width: 0.4517 } }" />
+<DrawnAnnotation text="allowHeadersPrefixed(&quot;X-Greet-&quot;)" label="Custom headers, by prefix" color="var(--fundamentals-blue)" :geometry="{ label: { x: 0.5886, y: 0.6461, width: 0.3000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application

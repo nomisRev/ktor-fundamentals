@@ -13,7 +13,7 @@ import io.ktor.server.routing.routing
 fun Application.module() {
   routing {
     post("/greet") {
-      val form = call.receiveParameters()
+      val form: Parameters = call.receiveParameters()
       call.respondText("Hello, ${form["name"]}")
     }
   }

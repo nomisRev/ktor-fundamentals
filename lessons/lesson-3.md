@@ -18,8 +18,8 @@ kodee: wave
 
 > Nullable everything, parsed by hand, checked by nobody
 
-<DrawnAnnotation text="call.parameters[&quot;name&quot;]" label="The key is spelled twice: in the pattern and in the handler" color="red" :geometry="{ label: { x: 0.72, y: 0.43, width: 0.4 } }" />
-<DrawnAnnotation text="call.parameters[&quot;hour&quot;]?.toInt()" label="Manual parsing: a bad `hour` is a `NumberFormatException`, so a `500`" color="red" :geometry="{ label: { x: 0.72, y: 0.53, width: 0.4 } }" />
+<DrawnAnnotation text="call.parameters[&quot;name&quot;]" label="The key is spelled twice: in the pattern and in the handler" color="red" :geometry="{ label: { x: 0.7867, y: 0.5131, width: 0.4000 } }" />
+<DrawnAnnotation text="call.parameters[&quot;hour&quot;]?.toInt()" label="Manual parsing: a bad `hour` is a `NumberFormatException`, so a `500`" color="red" :geometry="{ label: { x: 0.6772, y: 0.7572, width: 0.4000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -325,10 +325,10 @@ together; lesson 5 puts the feature's service next to them.
 
 # Routes are extensions of `Route`
 
-<DrawnAnnotation text="greetRoutes()" label="One call per group of routes, one file per group" :geometry="{ label: { x: 0.55, y: 0.34, width: 0.4 } }" />
-<DrawnAnnotation text="fun Route.greetRoutes()" label="An extension of `Route`: the same DSL, from anywhere" :geometry="{ label: { x: 0.78, y: 0.53, width: 0.4 } }" />
-<DrawnAnnotation text="delete(&quot;bye&quot;)" label="More than one route per function" :geometry="{ label: { x: 0.7, y: 0.72, width: 0.36 } }" />
-<DrawnAnnotation text="helloRoutes()" label="Groups nest: `/greet/{name}/hello/{hour}` lives in another file" :geometry="{ label: { x: 0.7, y: 0.93, width: 0.44 } }" />
+<DrawnAnnotation text="greetRoutes()" label="One call per group of routes, one file per group" :geometry="{ label: { x: 0.3506, y: 0.3181, width: 0.4000 } }" />
+<DrawnAnnotation text="fun Route.greetRoutes()" label="An extension of `Route`: the same DSL, from anywhere" :geometry="{ label: { x: 0.6737, y: 0.5593, width: 0.4000 } }" />
+<DrawnAnnotation text="delete(&quot;bye&quot;)" label="More than one route per function" :geometry="{ label: { x: 0.4075, y: 0.7204, width: 0.3600 } }" />
+<DrawnAnnotation text="helloRoutes()" label="Groups nest: `/greet/{name}/hello/{hour}` lives in another file" :geometry="{ label: { x: 0.4315, y: 0.9187, width: 0.4400 } }" />
 
 <TypeHint :line="2" receiver="Routing">
 <TypeHint :line="7" receiver="Route">
@@ -513,8 +513,8 @@ through the test host; functions like these are tested with nothing at all.
 
 > Template engines exist: Mustache, JTE, FreeMarker, Thymeleaf. Or write HTML as code.
 
-<DrawnAnnotation text="$name" label="`name` = `<script>…</script>`: injection" color="red" :geometry="{ label: { x: 0.83, y: 0.41, width: 0.32 } }" />
-<DrawnAnnotation text="ContentType.Text.Html" label="Right header, wrong tool" :geometry="{ label: { x: 0.72, y: 0.53, width: 0.3 } }" />
+<DrawnAnnotation text="$name" label="`name` = `<script>…</script>`: injection" color="red" :geometry="{ label: { x: 0.7243, y: 0.3857, width: 0.3200 } }" />
+<DrawnAnnotation text="ContentType.Text.Html" label="Right header, wrong tool" :geometry="{ label: { x: 0.6611, y: 0.5144, width: 0.3000 } }" />
 
 ```kotlin
 import io.ktor.http.ContentType
@@ -538,7 +538,7 @@ keeps the page in Kotlin.
 
 # HTML is a Kotlin DSL
 
-<DrawnAnnotation text="respondHtml" label="`ktor-server-html-builder`: `Content-Type: text/html`, status `200`" :geometry="{ label: { x: 0.66, y: 0.243, width: 0.42 } }" />
+<DrawnAnnotation text="respondHtml" label="`ktor-server-html-builder`: `Content-Type: text/html`, status `200`" :geometry="{ label: { x: 0.6665, y: 0.2855, width: 0.4200 } }" />
 
 <TypeHint :line="2" receiver="HTML">
 
@@ -573,7 +573,7 @@ magic-move
 
 # HTML is a Kotlin DSL
 
-<DrawnAnnotation text="h1 {" label="Nesting is nesting: a block per tag" :geometry="{ label: { x: 0.78, y: 0.48, width: 0.32 } }" />
+<DrawnAnnotation text="h1 {" label="Nesting is nesting: a block per tag" :geometry="{ label: { x: 0.3987, y: 0.5405, width: 0.3200 } }" />
 
 <TypeHint :line="3" receiver="HEAD">
 <TypeHint :line="6" receiver="BODY">
@@ -604,7 +604,7 @@ magic-move
 
 # HTML is a Kotlin DSL
 
-<DrawnAnnotation text="+&quot;Hello, $name!&quot;" label="`+` appends text, escaped: `<` becomes `&amp;lt;`" :geometry="{ label: { x: 0.72, y: 0.58, width: 0.4 } }" />
+<DrawnAnnotation text="+&quot;Hello, $name!&quot;" label="`+` appends text, escaped: `<` becomes `&amp;lt;`" :geometry="{ label: { x: 0.3288, y: 0.5688, width: 0.4000 } }" />
 
 ```kotlin
 import io.ktor.server.html.respondHtml
@@ -633,8 +633,8 @@ whole answer to the injection slide.
 
 # Control flow is plain Kotlin
 
-<DrawnAnnotation text="if (name.isEmpty())" label="A conditional, not a template directive" :geometry="{ label: { x: 0.7, y: 0.39, width: 0.36 } }" />
-<DrawnAnnotation text="forEach" label="Iteration: `G - I - V - E - N`" :geometry="{ label: { x: 0.55, y: 0.63, width: 0.3 } }" />
+<DrawnAnnotation text="if (name.isEmpty())" label="A conditional, not a template directive" :geometry="{ label: { x: 0.4879, y: 0.4349, width: 0.3600 } }" />
+<DrawnAnnotation text="forEach" label="Iteration: `G - I - V - E - N`" :geometry="{ label: { x: 0.4767, y: 0.6384, width: 0.3000 } }" />
 
 ```kotlin
 import io.ktor.server.html.respondHtml
@@ -667,7 +667,7 @@ understands all of it.
 
 # Templates are functions
 
-<DrawnAnnotation text="notEmpty(name, emptyMessage = &quot;No name&quot;)" label="The check moved out; only the happy path stays" :geometry="{ label: { x: 0.7, y: 0.34, width: 0.36 } }" />
+<DrawnAnnotation text="notEmpty(name, emptyMessage = &quot;No name&quot;)" label="The check moved out; only the happy path stays" :geometry="{ label: { x: 0.7305, y: 0.3979, width: 0.3600 } }" />
 
 ```kotlin
 import io.ktor.server.html.respondHtml
@@ -708,9 +708,9 @@ magic-move
 
 # Templates are functions
 
-<DrawnAnnotation text="FlowContent.notEmpty" label="Any tag that holds flow content can call it: `body`, `h1`, `div`" :geometry="{ label: { x: 0.66, y: 0.243, width: 0.44 } }" />
-<DrawnAnnotation text="content: FlowContent.() -> Unit" label="The nested document is a function with a receiver" :geometry="{ label: { x: 0.72, y: 0.385, width: 0.42 } }" />
-<DrawnAnnotation text="content()" label="Including it is calling it" :geometry="{ label: { x: 0.7, y: 0.48, width: 0.3 } }" />
+<DrawnAnnotation text="FlowContent.notEmpty" label="Any tag that holds flow content can call it: `body`, `h1`, `div`" :geometry="{ label: { x: 0.4799, y: 0.2130, width: 0.4400 } }" />
+<DrawnAnnotation text="content: FlowContent.() -> Unit" label="The nested document is a function with a receiver" :geometry="{ label: { x: 0.5584, y: 0.3431, width: 0.4200 } }" />
+<DrawnAnnotation text="content()" label="Including it is calling it" :geometry="{ label: { x: 0.7515, y: 0.4738, width: 0.3000 } }" />
 
 ```kotlin
 import io.ktor.server.html.respondHtml

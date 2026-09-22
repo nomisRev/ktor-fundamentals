@@ -795,23 +795,203 @@ enum class Type {
 
 
 ---
+magic-move
+---
 
 # DTOs are not the domain model
 
-> Lean `@Serializable` data classes at the edge; the domain stays free of wire concerns
+<DrawnAnnotation text="data class Greeting" label="The contract: rename a property here and every client notices" :geometry="{ label: { x: 0.66, y: 0.24, width: 0.40 } }" />
+<DrawnAnnotation text="class Recipient" label="The domain type: no annotation, the real `TimeZone`" color="var(--fundamentals-blue)" :geometry="{ label: { x: 0.65, y: 0.475, width: 0.46 } }" />
+<DrawnAnnotation text="TimeZone::of" label="The id travels as a `String`; resolve it where it is used" :geometry="{ label: { x: 0.64, y: 0.75, width: 0.40 } }" />
 
-- `@Serializable(with = MySerializer::class)` → private constructors, delegating to another class
-- a changed DTO is a changed contract: clients notice
-- `kotlinx.datetime` for dates and times; serialize a zone as its id, a `String`
+```kotlin
+import kotlinx.datetime.TimeZone
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+enum class Type {
+  @SerialName("hello") HELLO,
+  @SerialName("bye") BYE,
+}
+
+// Example
+@Serializable
+data class Greeting(
+  val type: Type = Type.HELLO,
+  val name: String,
+  @SerialName("tz") val timezone: String? = null,
+)
+
+class Recipient(val name: String, val timezone: TimeZone)
+
+fun Greeting.recipient(): Recipient =
+  Recipient(name, timezone?.let(TimeZone::of) ?: TimeZone.UTC)
+```
 
 <!--
-The library goes further than annotations: a custom `KSerializer` can wrap a
-class with a private constructor, delegate to a surrogate class, or read a
-legacy shape; see the kotlinx.serialization guide. Keep the DTOs lean and
-separate from the domain model, so that a change to one of them is visibly a
-change to the API. They can be shared between server and client. kotlinx.datetime
-discourages serializing `TimeZone` directly, since resolving an id can fail
-on another machine; send the id and resolve it where it is used.
+Keep the DTOs lean and separate from the domain model, so that a change to
+one of them is visibly a change to the API; they can be shared between server
+and client. The domain never sees `@SerialName` or a `String` that is really
+a zone. kotlinx.datetime deprecates its `TimeZoneSerializer` on purpose:
+resolving an id can fail on another machine with an older zone database, so
+the wire carries the id and `TimeZone.of` resolves it here, where a failure
+is this service's problem. An unknown id throws `IllegalTimeZoneException`
+in the handler; lesson 7 turns that into a `400` with status pages.
+-->
+
+---
+
+# `with =` replaces the generated serializer
+
+<DrawnAnnotation text="with = NameSerializer::class" label="Private constructor, validating factory: nothing to derive" :geometry="{ label: { x: 0.745, y: 0.21, width: 0.26 } }" />
+<DrawnAnnotation text="val name: Name" label="Validated on the way in, a `String` on the wire" :geometry="{ label: { x: 0.60, y: 0.665, width: 0.42 } }" />
+
+```kotlin
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+
+@Serializable
+enum class Type {
+  @SerialName("hello") HELLO,
+  @SerialName("bye") BYE,
+}
+
+object NameSerializer : KSerializer<Name> {
+  override val descriptor =
+    PrimitiveSerialDescriptor("Name", PrimitiveKind.STRING)
+  override fun serialize(encoder: Encoder, value: Name) =
+    encoder.encodeString(value.value)
+  override fun deserialize(decoder: Decoder): Name =
+    Name.of(decoder.decodeString())
+      ?: throw SerializationException("name is blank")
+}
+
+// Example
+@Serializable(with = NameSerializer::class)
+class Name private constructor(val value: String) {
+  companion object {
+    fun of(raw: String): Name? = raw.trim().ifBlank { null }?.let(::Name)
+  }
+}
+
+@Serializable
+data class Greeting(
+  val type: Type = Type.HELLO,
+  val name: Name,
+  @SerialName("tz") val timezone: String? = null,
+)
+```
+
+<DrawnAnnotation text="&quot;Alex&quot;" label="Same wire shape as a `String`" :geometry="{ label: { x: 0.52, y: 0.845, width: 0.30 } }" />
+
+```json
+{ "name": "Alex" }
+```
+
+<!--
+The plug-in derives a serializer from the primary constructor and the
+properties with a backing field. It cannot know about `of`: a generated
+serializer would call the private constructor directly and skip the
+validation. `with =` points the class, or a single property, at a serializer
+you write; the same mechanism covers a type from a library you do not own or
+a legacy shape read through a surrogate class.
+-->
+
+---
+magic-move
+---
+
+# A `KSerializer` is a descriptor and two functions
+
+<DrawnAnnotation text="KSerializer<Name>" label="The interface the plug-in implements for you" :geometry="{ label: { x: 0.77, y: 0.47, width: 0.20 } }" />
+<DrawnAnnotation text="PrimitiveSerialDescriptor(&quot;Name&quot;, PrimitiveKind.STRING)" label="Names the wire shape: still a string" :geometry="{ label: { x: 0.785, y: 0.625, width: 0.15 } }" />
+<DrawnAnnotation text="throw SerializationException" label="A blank name is a `400` before the handler runs" color="red" :geometry="{ label: { x: 0.765, y: 0.86, width: 0.20 } }" />
+
+```kotlin
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+
+@Serializable(with = NameSerializer::class)
+class Name private constructor(val value: String) {
+  companion object {
+    fun of(raw: String): Name? = raw.trim().ifBlank { null }?.let(::Name)
+  }
+}
+
+object NameSerializer : KSerializer<Name> {
+  override val descriptor =
+    PrimitiveSerialDescriptor("Name", PrimitiveKind.STRING)
+  override fun serialize(encoder: Encoder, value: Name) =
+    encoder.encodeString(value.value)
+  override fun deserialize(decoder: Decoder): Name =
+    Name.of(decoder.decodeString())
+      ?: throw SerializationException("name is blank")
+}
+```
+
+<!--
+A descriptor that names the wire shape, and one function per direction:
+`Encoder` and `Decoder` are format agnostic, so this serializer works for
+JSON, CBOR and ProtoBuf alike. `ContentNegotiation` wraps whatever
+`deserialize` throws in a `BadRequestException`, so the client sees a `400`
+and the handler never sees a blank `Name`. For a class-shaped wire format,
+delegate to a `@Serializable` surrogate class instead of encoding by hand;
+the kotlinx.serialization guide has the recipe.
+-->
+
+---
+
+# Dates and times are ISO 8601 strings
+
+<DrawnAnnotation text="LocalDateTime" label="ISO 8601, from `kotlinx.datetime`" :geometry="{ label: { x: 0.71, y: 0.30, width: 0.34 } }" />
+<DrawnAnnotation text="val timezone: String" label="No `TimeZone` serializer: send the id" color="var(--fundamentals-pink)" :geometry="{ label: { x: 0.71, y: 0.383, width: 0.34 } }" />
+<DrawnAnnotation text="Instant" label="`kotlin.time.Instant` is built in" :geometry="{ label: { x: 0.71, y: 0.465, width: 0.34 } }" />
+
+```kotlin
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class Talk(
+  val title: String,
+  val startsAt: LocalDateTime,
+  @SerialName("tz") val timezone: String,
+  val createdAt: Instant,
+)
+```
+
+```json
+{
+  "title": "Ktor Fundamentals",
+  "startsAt": "2026-09-21T09:00",
+  "tz": "Europe/Brussels",
+  "createdAt": "2026-09-20T15:04:05Z"
+}
+```
+
+<!--
+`LocalDate`, `LocalTime`, `LocalDateTime` and `UtcOffset` from kotlinx.datetime
+and `kotlin.time.Instant` from the standard library (kotlinx.serialization 1.9
+and later) all serialize as the ISO 8601 string their `toString` produces, and
+parse it back; component serializers exist for a JSON object instead.
+`TimeZone` is the exception: kotlinx.datetime deprecated its serializer,
+because an id such as `Europe/Brussels` only means something on a machine
+whose zone database knows it. A local date and time plus a zone id is what a
+calendar sends; an `Instant` is what a log or an audit trail sends.
 -->
 
 ---
@@ -875,8 +1055,8 @@ magic-move
 
 # The handler sees objects, not bytes
 
-<DrawnAnnotation text="data class GreetingResponse" label="Typed on the way out too" :geometry="{ label: { x: 0.75, y: 0.243, width: 0.3 } }" />
-<DrawnAnnotation text="call.respond(GreetingResponse(message))" label="`Accept` picks the converter; `respondText` bypasses negotiation" />
+<DrawnAnnotation text="data class GreetingResponse" label="Typed on the way out too" :geometry="{ label: { x: 0.7191, y: 0.2431, width: 0.3000 } }" />
+<DrawnAnnotation text="call.respond(GreetingResponse(message))" label="`Accept` picks the converter; `respondText` bypasses negotiation"  :geometry="{ label: { x: 0.4408, y: 0.8364 } }"/>
 
 ```kotlin
 import io.ktor.serialization.kotlinx.json.json
