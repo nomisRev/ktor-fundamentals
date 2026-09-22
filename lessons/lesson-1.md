@@ -19,16 +19,16 @@ kodee: welcome
 > By JetBrains, at `ktor.io`. Multiplatform
 
 - `server` → REST services, web applications, microservices
-- `client` → calling other HTTP services (lesson 5)
-- `WebSockets`, `OpenAPI` → protocols on top of HTTP (lesson 6)
+- `client` → calling other HTTP services (lesson 6)
+- `WebSockets`, `OpenAPI` → protocols on top of HTTP (lesson 7)
 
 <!--
 The whole course is about HTTP, on both sides of the wire. The first lessons
-focus on the server; the client shows up in lesson 5 when we talk to other
+focus on the server; the client shows up in lesson 6 when we talk to other
 services. Ktor leans on Kotlin: extension functions, lambdas with receivers,
 coroutines. Every slide in this deck is Ktor 3.6.0. What is left out on
 purpose: talking to a database is its own course, Exposed Fundamentals;
-template engines get one mention in lesson 3; Kotlin/Native servers and
+template engines get one mention in lesson 4; Kotlin/Native servers and
 HTTP/2 and HTTP/3 are configuration of the engine, not of the application.
 -->
 
@@ -265,7 +265,7 @@ fun main() {
 ```
 
 <!--
-Lesson 7 runs `module()` inside `testApplication { }` without Netty or a
+Lesson 8 runs `module()` inside `testApplication { }` without Netty or a
 port. That only works because starting the engine and configuring the
 application are two different functions.
 -->
@@ -440,7 +440,7 @@ and turns the JSON body into a `Greeting`, on the way out it turns the
 `Greeting` we respond with back into JSON. The handler never sees bytes.
 Strictly, the plug-in hooks into `receive` and `respond` rather than
 running before and after the handler, which is why nothing happens until
-the handler asks for the body. Lesson 2 covers `receive` and `respond`.
+the handler asks for the body. Lesson 3 covers `receive` and `respond`.
 -->
 
 ---
@@ -478,14 +478,21 @@ magic-move
 <TypeHint :line="3" receiver="CompressionConfig">
 
 ```kotlin
+import io.ktor.http.ContentType.Audio
+import io.ktor.http.ContentType.Image
+import io.ktor.http.ContentType.Text
+import io.ktor.http.ContentType.Video
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.plugins.compression.Compression
+import io.ktor.server.plugins.compression.CompressionConfig
+import io.ktor.server.plugins.compression.deflate
+import io.ktor.server.plugins.compression.excludeContentType
+import io.ktor.server.plugins.compression.gzip
+import io.ktor.server.plugins.compression.identity
+import io.ktor.server.plugins.compression.minimumSize
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
 
 fun Application.module() {
   install(ContentNegotiation) { json() }
@@ -502,6 +509,7 @@ fun Application.module() {
 
     excludeContentType(Audio.Any, Video.Any, Image.Any, Text.EventStream)
   }
+}
 ```
 
 </TypeHint>

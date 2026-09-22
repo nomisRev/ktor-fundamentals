@@ -1,34 +1,18 @@
-# Ship the greeting service as a container
+# Configure the greeting service from a file
 
-Two exercises are code: `resources/application.yaml` (the port and the
-secret; in a Gradle project the file is `src/main/resources/application.yaml`)
-and `settings()` in `src/configuration/Application.kt`. Check them with
+The code steps are the exercises in `resources/application.yaml` (in a Gradle
+project the file is `src/main/resources/application.yaml`) and
+`src/configuration/Application.kt`: the file, the `@Serializable` classes that
+mirror it, and `loadConfig()`. Check them with
 `./kotlin test --include-module configuration` from `exercises/`.
 
-The rest of the slide happens in the Gradle project of lesson 1, with the
-Ktor Gradle plug-in and `EngineMain` as the main class:
+The last bullet of the slide is not a test:
 
-```kotlin
-plugins {
-  application
-  id("io.ktor.plugin") version "3.6.0"
-}
-
-application {
-  mainClass.set("configuration.ApplicationKt")
-}
-
-ktor {
-  docker {
-    localImageName.set("greeting-service")
-    imageTag.set("0.0.1")
-  }
-}
-```
-
-1. `./gradlew buildImage` builds the image with Jib; no Dockerfile.
-2. `./gradlew runDocker` runs it and maps the port.
-3. Start it again with a different port:
-   `docker run -e PORT=9090 -p 9090:9090 greeting-service:0.0.1`. The log says
-   `Responding at http://0.0.0.0:9090` because `"$PORT:8080"` in
-   `application.yaml` prefers the variable over the default.
+1. Add a `github` section to the file with `token: "$GITHUB_TOKEN"` and no
+   fallback, and a `GitHub` data class with a `token` to `Config`.
+2. Run `main` without the variable set. The server does not start: the
+   exception names the key that could not be resolved, before a port is
+   bound.
+3. Run it again with `GITHUB_TOKEN=anything` in the environment, and with
+   `PORT=9090`. The log says `Responding at http://0.0.0.0:9090` because
+   `"$PORT:8080"` prefers the variable over the fallback.

@@ -3,41 +3,28 @@ package configuration
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.server.config.ApplicationConfig
-import io.ktor.server.config.MapApplicationConfig
 import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 
 class ApplicationTest {
   @Test
-  fun `application yaml holds the port and the secret`() {
+  fun `application yaml holds the host and the port`() {
     val config = ApplicationConfig("application.yaml")
-    assertEquals("8080", config.propertyOrNull("ktor.deployment.port")?.getString(), "no ktor.deployment.port")
-    assertNotNull(config.propertyOrNull("jwt.secret"), "no jwt.secret")
-    assertEquals(listOf("configuration.ApplicationKt.module"), config.property("ktor.application.modules").getList())
+    assertEquals("0.0.0.0", config.propertyOrNull("server.host")?.getString(), "no server.host")
+    assertEquals("8080", config.propertyOrNull("server.port")?.getString(), "no server.port")
   }
 
   @Test
-  fun `settings reads the configuration`() = testApplication {
-    environment {
-      config = MapApplicationConfig(
-        "ktor.deployment.port" to "9090",
-        "jwt.secret" to "s3cret",
-      )
-    }
+  fun `loadConfig deserialises the file`() {
+    assertEquals(Config(Server(host = "0.0.0.0", port = 8080)), loadConfig())
+  }
+
+  @Test
+  fun `the module answers from the loaded values`() = testApplication {
     application {
-      assertEquals(Settings(port = 9090, jwtSecret = "s3cret"), settings())
-      module()
+      module(Config(Server(host = "localhost", port = 9090)))
     }
-    assertEquals("Greeting service on port 9090", client.get("/").bodyAsText())
-  }
-
-  @Test
-  fun `the module is loaded from application yaml`() = testApplication {
-    environment {
-      config = ApplicationConfig("application.yaml")
-    }
-    assertEquals("Greeting service on port 8080", client.get("/").bodyAsText())
+    assertEquals("Greeting service on localhost:9090", client.get("/").bodyAsText())
   }
 }

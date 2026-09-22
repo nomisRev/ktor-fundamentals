@@ -1,9 +1,3 @@
-ktor:
-  deployment:
-    port: "$PORT:8080"
-  application:
-    modules:
-      - configuration.ApplicationKt.module
-
-jwt:
-  secret: "$JWT_SECRET:change-me"
+server:
+  host: "$HOST:0.0.0.0"
+  port: "$PORT:8080"

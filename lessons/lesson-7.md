@@ -8,1247 +8,734 @@ kodee: wave
 
 <div class="lesson-number">Lesson 7</div>
 
-# Status pages, testing and metrics
+# WebSockets and OpenAPI
 
-## Failures, tests, and numbers
+## Two-way messages, described APIs
 
 ---
 
-# The default error page is not yours
+# HTTP answers, a WebSocket stays open
 
-> An unknown route, a missing login, an exception in a handler: each one is still a response
+> One request, one response; or one connection both sides write to
 
-<DrawnAnnotation text="404 Not Found" label="Ktor's default: the right status and an empty body, a blank page in the browser" :geometry="{ label: { x: 0.72, y: 0.45, width: 0.44 } }" />
-
-```http
-GET /nowhere HTTP/1.1
-Host: localhost:8080
-
-HTTP/1.1 404 Not Found
-Content-Length: 0
-```
+| `HTTP/1.1 101 Switching Protocols` | the handshake: a `GET` with `Upgrade: websocket`     |
+|------------------------------------|-------------------------------------------------------|
+| `Frame.Text`, `Frame.Binary`       | messages, in either direction, at any time            |
+| `Frame.Ping`, `Frame.Pong`         | keep the connection alive; Ktor answers them for you  |
+| `Frame.Close`                      | a graceful end, with a code and a reason              |
 
 <!--
-Three kinds of failure reach the client: no route matched, `404`; a
-route refused the caller, `401` or `403`, lesson 8; a handler threw, and
-Ktor answers `500` with nothing in the body. The status is right every
-time, the page never is: a JSON API wants a JSON error, a website wants
-its own template. One plug-in owns all three cases.
+HTTP is fire-and-forget: the client asks, the server answers, the
+connection is done. A WebSocket starts as an HTTP request and, after the
+`101`, stays open: either side sends a frame whenever it wants. Every
+browser speaks it natively, no plug-in needed. The handshake, the pings,
+and the close are handled by Ktor; the frames in between are ours.
 -->
 
 ---
 
-# `StatusPages` rewrites the response
+# WebSockets are a plug-in
 
-<DrawnAnnotation text="install(StatusPages)" label="`ktor-server-status-pages`: one plug-in for every failure" :geometry="{ label: { x: 0.74, y: 0.22, width: 0.4 } }" />
-<DrawnAnnotation text="status(HttpStatusCode.NotFound)" label="Runs when a handler, or no handler, answers `404`; `Unauthorized` works the same" :geometry="{ label: { x: 0.7, y: 0.52, width: 0.44 } }" />
-<DrawnAnnotation text="call.respondHtml(status)" />
-
-<TypeHint :line="2" receiver="StatusPagesConfig">
+<DrawnAnnotation text="install(WebSockets)" label="`ktor-server-websockets`; the client has a plug-in of its own" :geometry="{ label: { x: 0.4593, y: 0.2744, width: 0.4000 } }" />
 
 ```kotlin
-import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import io.ktor.server.html.respondHtml
-import io.ktor.server.plugins.statuspages.StatusPages
-import kotlinx.html.body
-import kotlinx.html.h1
+import io.ktor.server.websocket.WebSockets
 
 fun Application.module() {
-  install(StatusPages) {
-    status(HttpStatusCode.NotFound) { call, status ->
-      call.respondHtml(status) {
-        body { h1 { +"Keep looking somewhere else" } }
-      }
-    }
-  }
+  install(WebSockets)
   routes()
 }
 ```
 
+<!--
+The defaults are fine for almost everyone: `pingPeriod` (off by default,
+set it to keep proxies from dropping idle connections), `timeout`,
+`maxFrameSize`, `masking`. `ktor-client-websockets` installs the same
+plug-in on the client, `io.ktor.client.plugins.websocket.WebSockets`.
+-->
+
+---
+
+# A handler loops over `incoming`
+
+<DrawnAnnotation text="webSocket(&quot;/greet&quot;)" label="A `GET /greet` that upgrades: the block runs for the whole connection" on="0" :geometry="{ label: { x: 0.5927, y: 0.3037, width: 0.4000 } }" />
+<DrawnAnnotation text="for (frame in incoming)" label="`incoming` is a channel of frames; the loop ends when the socket closes" on="1" :geometry="{ label: { x: 0.5650, y: 0.3744, width: 0.4000 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.routing.routing
+import io.ktor.server.websocket.webSocket
+import io.ktor.websocket.Frame
+import io.ktor.websocket.readText
+import io.ktor.websocket.send
+
+fun Application.routes() {
+  routing {
+    webSocket("/greet") {
+      for (frame in incoming) {
+        when (frame) {
+          is Frame.Text -> send("Hello, ${frame.readText()}")
+          else -> {}
+        }
+      }
+    }
+  }
+}
+```
+
+---
+magic-move
+---
+
+# A handler loops over `incoming`
+
+<DrawnAnnotation text="is Frame.Text" label="Frames are types: text here; binary, ping, and close take other branches" on="0" :geometry="{ label: { x: 0.4963, y: 0.5142, width: 0.4200 } }" />
+<DrawnAnnotation text="send(" label="`send` writes one text frame to `outgoing`" on="1" :geometry="{ label: { x: 0.4746, y: 0.5153, width: 0.3600 } }" />
+
+<TypeHint :line="3" receiver="DefaultWebSocketServerSession">
+<SmartCast :line="6" text="frame">
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.routing.routing
+import io.ktor.server.websocket.webSocket
+import io.ktor.websocket.Frame
+import io.ktor.websocket.readText
+import io.ktor.websocket.send
+
+fun Application.routes() {
+  routing {
+    webSocket("/greet") {
+      for (frame in incoming) {
+        when (frame) {
+          is Frame.Text -> send("Hello, ${frame.readText()}")
+          else -> {}
+        }
+      }
+    }
+  }
+}
+```
+
+</SmartCast>
 </TypeHint>
 
 <!--
-The plug-in intercepts a response with that status and lets you answer
-again: the same `call.respond` family as lesson 2, so JSON, HTML, or a
-redirect. `status` takes several codes at once; `unhandled { }` catches a
-call no route answered, which is the `404` case seen from the other
-side. Keep passing the status: `respondHtml { }` alone would answer `200`
-with the error page inside.
--->
-
----
-magic-move
----
-
-# `StatusPages` rewrites the response
-
-<DrawnAnnotation text="statusFile(" label="Several codes, one template each, served from the classpath" :geometry="{ label: { x: 0.74, y: 0.29, width: 0.4 } }" />
-<DrawnAnnotation text="&quot;static/error/#.html&quot;" label="`#` becomes the code: `401.html`, `404.html`" :geometry="{ label: { x: 0.76, y: 0.43, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.plugins.statuspages.statusFile
-
-fun Application.module() {
-  install(StatusPages) {
-    statusFile(
-      HttpStatusCode.Unauthorized,
-      HttpStatusCode.NotFound,
-      filePattern = "static/error/#.html",
-    )
-  }
-  routes()
-}
-```
-
-<!--
-The files live in `src/main/resources/static/error/`, the same place
-`staticResources` of lesson 4 serves from. A missing template answers
-`500`, so ship one per listed code. This is the uniform version of the
-previous slide: no Kotlin per page, a designer can own the HTML.
--->
-
----
-magic-move
----
-
-# `StatusPages` rewrites the response
-
-<DrawnAnnotation text="exception<Throwable>" label="Any exception escaping a handler; the type parameter is the filter" :geometry="{ label: { x: 0.74, y: 0.29, width: 0.4 } }" />
-<DrawnAnnotation text="HttpStatusCode.InternalServerError" />
-
-```kotlin
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.html.respondHtml
-import io.ktor.server.plugins.statuspages.StatusPages
-import kotlinx.html.body
-import kotlinx.html.h1
-import kotlinx.html.p
-
-fun Application.module() {
-  install(StatusPages) {
-    exception<Throwable> { call, cause ->
-      call.respondHtml(HttpStatusCode.InternalServerError) {
-        body {
-          h1 { +"This is embarrassing" }
-          cause.message?.let { p { +it } }
-        }
-      }
-    }
-  }
-  routes()
-}
-```
-
-<!--
-Without this, an exception is logged and the client gets an empty
-`500`. With it, the handler's failure becomes a response you designed.
-The most specific registered type wins when several match, so a
-`Throwable` handler is the safety net under narrower ones.
--->
-
----
-magic-move
----
-
-# The message is not for the client
-
-<DrawnAnnotation text="cause.message?.let { p { +it } }" label="Exfiltration: a table name, a file path, a connection string, sent to whoever asked" color="red" :geometry="{ label: { x: 0.72, y: 0.6, width: 0.44 } }" />
-
-```kotlin
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.html.respondHtml
-import io.ktor.server.plugins.statuspages.StatusPages
-import kotlinx.html.body
-import kotlinx.html.h1
-import kotlinx.html.p
-
-fun Application.module() {
-  install(StatusPages) {
-    exception<Throwable> { call, cause ->
-      call.respondHtml(HttpStatusCode.InternalServerError) {
-        body {
-          h1 { +"This is embarrassing" }
-          cause.message?.let { p { +it } }
-        }
-      }
-    }
-  }
-  routes()
-}
-```
-
-<!--
-An exception message is written for the developer who reads the log:
-`connection refused to db.internal:5432`, `relation "users" does not
-exist`, `/etc/app/secrets.conf (permission denied)`. Every one of those
-is reconnaissance for an attacker. The page says something went wrong;
-the log, or an error tracker, gets the rest.
--->
-
----
-magic-move
----
-
-# Narrow the exception, log the detail
-
-<DrawnAnnotation text="context(logger: Logger)" label="A context parameter: whoever calls `module` supplies the logger" :geometry="{ label: { x: 0.74, y: 0.2, width: 0.4 } }" />
-<DrawnAnnotation text="exception<DatabaseException>" label="Only this type and its subclasses; anything else falls through to the default `500`" :geometry="{ label: { x: 0.78, y: 0.31, width: 0.32 } }" />
-<DrawnAnnotation text="logger.log(&quot;db: ${cause.message}&quot;)" label="The detail goes to the log, the client gets the page" :geometry="{ label: { x: 0.76, y: 0.57, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.html.respondHtml
-import io.ktor.server.plugins.statuspages.StatusPages
-import kotlinx.html.body
-import kotlinx.html.h1
-
-context(logger: Logger)
-fun Application.module() {
-  install(StatusPages) {
-    exception<DatabaseException> { call, cause ->
-      logger.log("db: ${cause.message}")
-      call.respondHtml(HttpStatusCode.InternalServerError) {
-        body { h1 { +"This is embarrassing" } }
-      }
-    }
-  }
-  routes()
-}
-```
-
-<!--
-`exception<T>` is generic in the exception type, so one handler per
-failure family: a `DatabaseException` becomes a `503` with a retry hint, a
-`ValidationException` a `400` with the field names, and the `Throwable`
-handler stays as the net. The `Logger` here is the deck's tiny interface;
-in a real module it is `log`, the SLF4J logger every `Application` has.
-Context parameters are Kotlin 2.2+, `-Xcontext-parameters`; a plain
-`Application.module(logger: Logger)` says the same with more typing.
+`webSocket` is a route like `get`, but its block is a
+`DefaultWebSocketServerSession`: `incoming` and `outgoing` are channels of
+`Frame`, `send` is a shortcut for `outgoing.send(Frame.Text(…))`. The
+`for` loop suspends between frames and ends when the channel closes, so the
+handler returns when the client hangs up. `Frame.Binary` carries bytes,
+`readBytes()`; ping, pong, and close frames are handled by the plug-in
+before they reach us, which is why `else` is empty.
 -->
 
 ---
 
-# Validation is a plug-in
+# IntelliJ's HTTP client speaks WebSockets
 
-> Lesson 2 answered `400` for a blank name by hand
+> Any `.http` file in IntelliJ IDEA; the reply appears in the Services tool window
 
-<DrawnAnnotation text="install(RequestValidation)" label="`ktor-server-request-validation`: runs after `ContentNegotiation` built the object" :geometry="{ label: { x: 0.73, y: 0.352, width: 0.5 } }" />
-<DrawnAnnotation text="validate<Greeting>" />
-<DrawnAnnotation text="ValidationResult.Invalid(" />
-<DrawnAnnotation text="ValidationResult.Valid" label="One rule per body type: the handler only ever sees a valid one" :geometry="{ label: { x: 0.71, y: 0.52, width: 0.5 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.plugins.requestvalidation.RequestValidation
-import io.ktor.server.plugins.requestvalidation.ValidationResult
-
-fun Application.module() {
-  install(RequestValidation) {
-    validate<Greeting> { greeting ->
-      if (greeting.name.isBlank()) ValidationResult.Invalid("name is blank")
-      else ValidationResult.Valid
-    }
-  }
-  routes()
-}
-```
-
-<!--
-`Greeting` is lesson 2's DTO. The rule is stated once, next to the
-plug-ins, and every `call.receive<Greeting>()` in the application runs
-it: a handler that gets a `Greeting` gets a valid one. The block
-suspends, so a lookup is welcome; `validate { filter { }; validation { } }`
-matches on anything other than the type. What happens with an invalid
-body is the next slide.
--->
-
----
-magic-move
----
-
-# A failed validation is a `400`
-
-<DrawnAnnotation text="install(StatusPages)" label="An exception like any other: `StatusPages` gives it its status" :geometry="{ label: { x: 0.675, y: 0.525, width: 0.63 } }" />
-<DrawnAnnotation text="exception<RequestValidationException>" />
-<DrawnAnnotation text="cause.reasons" label="Every `Invalid` reason, collected" :geometry="{ label: { x: 0.45, y: 0.666, width: 0.5 } }" />
-
-```kotlin
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.plugins.requestvalidation.RequestValidation
-import io.ktor.server.plugins.requestvalidation.RequestValidationException
-import io.ktor.server.plugins.requestvalidation.ValidationResult
-import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.response.respond
-
-fun Application.module() {
-  install(RequestValidation) {
-    validate<Greeting> { greeting ->
-      if (greeting.name.isBlank()) ValidationResult.Invalid("name is blank")
-      else ValidationResult.Valid
-    }
-  }
-  install(StatusPages) {
-    exception<RequestValidationException> { call, cause ->
-      call.respond(HttpStatusCode.BadRequest, cause.reasons.joinToString())
-    }
-  }
-  routes()
-}
-```
-
-<!--
-The plug-in throws; it does not answer. That is on purpose: the shape of
-the error response is yours, and `StatusPages` from the start of this
-lesson is where it is decided, once, for every route. A JSON API
-responds with a `@Serializable` error object here instead of a string.
-Without the handler the exception is an ordinary `500`.
--->
-
----
-
-# A plug-in can be scoped to a route
-
-<DrawnAnnotation text="route(&quot;/greet&quot;)" label="Only this subtree validates: `route { }` has its own `install`" :geometry="{ label: { x: 0.65, y: 0.289, width: 0.62 } }" />
-<DrawnAnnotation text="install(RequestValidation)" label="`CallId`, `CORS`, `RateLimit`, `Authentication` install the same way" :geometry="{ label: { x: 0.75, y: 0.36, width: 0.46 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.plugins.requestvalidation.RequestValidation
-import io.ktor.server.plugins.requestvalidation.ValidationResult
-import io.ktor.server.request.receive
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.post
-import io.ktor.server.routing.route
-import io.ktor.server.routing.routing
-
-fun Application.module() {
-  routing {
-    route("/greet") {
-      install(RequestValidation) {
-        validate<Greeting> { greeting ->
-          if (greeting.name.isBlank()) ValidationResult.Invalid("name is blank")
-          else ValidationResult.Valid
-        }
-      }
-      post {
-        call.respondText("Hello, ${call.receive<Greeting>().name}")
-      }
-    }
-  }
-}
-```
-
-<!--
-Most plug-ins are `RouteScopedPlugin`s: installed on the application
-they apply everywhere, installed inside a `route { }` only below it. An
-admin subtree with stricter validation, a public one with `CORS`, a
-login route with a rate limit, lesson 8: the pipeline is per route as
-much as per application. `createRouteScopedPlugin` is the
-`createApplicationPlugin` of the next slide for your own.
--->
-
----
-
-# A plug-in hooks into the pipeline
-
-> When `StatusPages` is not enough, write your own
-
-<DrawnAnnotation text="createApplicationPlugin(&quot;MyPlugin&quot;)" label="`io.ktor.server.application`: a value, installed like any plug-in" :geometry="{ label: { x: 0.77, y: 0.36, width: 0.28 } }" />
-<DrawnAnnotation text="onCallRespond" label="Before the body is parsed, and after `respond`: where most plug-ins live" :geometry="{ label: { x: 0.74, y: 0.47, width: 0.4 } }" />
-<DrawnAnnotation text="on(CallFailed)" label="Other hooks: `CallFailed`, `CallSetup`, `ResponseSent`, `MonitoringEvent(…)`" :geometry="{ label: { x: 0.72, y: 0.61, width: 0.44 } }" />
-
-```kotlin
-import io.ktor.server.application.createApplicationPlugin
-import io.ktor.server.application.hooks.CallFailed
-
-val MyPlugin = createApplicationPlugin("MyPlugin") {
-  onCallReceive { call -> TODO() }
-  onCallRespond { call -> TODO() }
-  on(CallFailed) { call, cause -> TODO() }
-}
-```
-
-<!--
-Every request walks a pipeline of phases; a plug-in registers handlers
-at points on it. `onCall` runs first, on every request; `onCallReceive`
-when a handler asks for the body; `onCallRespond` when it answers. `on`
-takes a hook object for everything else: `CallFailed` gets the exception,
-`ResponseSent` runs after the bytes left, `MonitoringEvent(ApplicationStopped)`
-is where `StatusPages`, `CORS`, and `MicrometerMetrics` are all written
-with this same API; `createApplicationPlugin` also takes a configuration
-class, which is what the `install(X) { … }` block fills in.
--->
-
----
-
-# A marker object stands for a page
-
-> Several templates, chosen by the handler: better than an exception per page
-
-<DrawnAnnotation text="object SayPlease" label="No fields: the type is the whole message" :geometry="{ label: { x: 0.76, y: 0.36, width: 0.36 } }" />
-<DrawnAnnotation text="call.respond(SayPlease)" label="An ordinary `respond`; without a plug-in it would go out as `{}`" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.response.respond
-import io.ktor.server.routing.RoutingContext
-import kotlinx.serialization.Serializable
-
-@Serializable
-object SayPlease
-
-suspend fun RoutingContext.please() {
-  call.respond(SayPlease)
-}
-```
-
-<!--
-Throwing to render a page works, `StatusPages` catches it, but an
-exception for a normal outcome is a lie in the type system and costs a
-stack trace. A marker value is a plain response; the plug-in on the next
-slide decides what it looks like on the wire. `@Serializable` keeps
-`ContentNegotiation` happy if the plug-in is missing.
--->
-
----
-
-# `transformBody` swaps the body
-
-<DrawnAnnotation text="onCallRespond { call ->" label="Every `call.respond` passes through here, before `ContentNegotiation`" :geometry="{ label: { x: 0.72, y: 0.25, width: 0.44 } }" />
-
-```kotlin
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.TextContent
-import io.ktor.http.withCharset
-import io.ktor.server.application.createApplicationPlugin
-import kotlinx.html.body
-import kotlinx.html.h1
-import kotlinx.html.html
-import kotlinx.html.stream.createHTML
-
-val FourOhFour = createApplicationPlugin("FourOhFour") {
-  onCallRespond { call ->
-    transformBody { body ->
-      when (body) {
-        is SayPlease -> TextContent(
-          text = createHTML().html { body { h1 { +"Say please" } } },
-          contentType = ContentType.Text.Html.withCharset(Charsets.UTF_8),
-          status = HttpStatusCode.Forbidden,
-        )
-        else -> body
-      }
-    }
-  }
-}
-```
-
----
-magic-move
----
-
-# `transformBody` swaps the body
-
-<DrawnAnnotation text="transformBody { body ->" label="`body` is whatever the handler passed to `respond`; return it, or another" :geometry="{ label: { x: 0.72, y: 0.3, width: 0.44 } }" />
-
-```kotlin
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.TextContent
-import io.ktor.http.withCharset
-import io.ktor.server.application.createApplicationPlugin
-import kotlinx.html.body
-import kotlinx.html.h1
-import kotlinx.html.html
-import kotlinx.html.stream.createHTML
-
-val FourOhFour = createApplicationPlugin("FourOhFour") {
-  onCallRespond { call ->
-    transformBody { body ->
-      when (body) {
-        is SayPlease -> TextContent(
-          text = createHTML().html { body { h1 { +"Say please" } } },
-          contentType = ContentType.Text.Html.withCharset(Charsets.UTF_8),
-          status = HttpStatusCode.Forbidden,
-        )
-        else -> body
-      }
-    }
-  }
-}
-```
-
-<!--
-`transformBody` is the main tool for writing Ktor plug-ins: refine what
-came in, on `onCallReceive`; rewrite what goes out, on `onCallRespond`.
-`ContentNegotiation` is exactly this, a transform from your data class to
-JSON bytes; `Compression` a transform from bytes to smaller bytes.
--->
-
----
-magic-move
----
-
-# `transformBody` swaps the body
-
-<DrawnAnnotation text="is SayPlease -> TextContent(" label="The marker becomes a `403` page: `TextContent` is what `respondHtml` builds" :geometry="{ label: { x: 0.72, y: 0.31, width: 0.44 } }" />
-<DrawnAnnotation text="else -> body" label="Everything else untouched: the shape of every transform" :geometry="{ label: { x: 0.74, y: 0.62, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.content.TextContent
-import io.ktor.http.withCharset
-import io.ktor.server.application.createApplicationPlugin
-import kotlinx.html.body
-import kotlinx.html.h1
-import kotlinx.html.html
-import kotlinx.html.stream.createHTML
-
-val FourOhFour = createApplicationPlugin("FourOhFour") {
-  onCallRespond { call ->
-    transformBody { body ->
-      when (body) {
-        is SayPlease -> TextContent(
-          text = createHTML().html { body { h1 { +"Say please" } } },
-          contentType = ContentType.Text.Html.withCharset(Charsets.UTF_8),
-          status = HttpStatusCode.Forbidden,
-        )
-        else -> body
-      }
-    }
-  }
-}
-```
-
-<!--
-The pattern: a `when` over the special cases, `else -> body` at the end.
-`TextContent` is an `OutgoingContent`, Ktor's representation of a
-finished response, status and content type included; `respondHtml`
-builds exactly this one, with `createHTML()` from `kotlinx.html.stream`.
-A second marker is a second branch, a second template.
--->
-
----
-
-# Installation order is execution order
-
-<DrawnAnnotation text="install(FourOhFour)" label="First: it sees `SayPlease` before `ContentNegotiation` turns it into JSON" :geometry="{ label: { x: 0.72, y: 0.25, width: 0.44 } }" />
-<DrawnAnnotation text="install(ContentNegotiation)" />
-
-```kotlin
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-
-fun Application.module() {
-  install(FourOhFour)
-  install(ContentNegotiation) {
-    json()
-  }
-  routes()
-}
-```
-
-<!--
-Both plug-ins hook the same transform phase, and hooks run in the order
-they were installed. The other way around, `ContentNegotiation` would
-serialize `SayPlease` to `{}` and `FourOhFour` would only ever see bytes.
-It is just a plug-in: `install` it, and every route gets the behaviour.
--->
-
----
-
-# A test runs server and client in one process
-
-<DrawnAnnotation text="testApplication" label="`ktor-server-test-host`: starts the application inside the test, no port, no network" :geometry="{ label: { x: 0.7, y: 0.29, width: 0.44 } }" />
-<DrawnAnnotation text="application { module() }" label="The module `embeddedServer` runs, unchanged" :geometry="{ label: { x: 0.76, y: 0.4, width: 0.36 } }" />
-<DrawnAnnotation text="client.get(" label="A ready-made client, wired to the test engine" :geometry="{ label: { x: 0.76, y: 0.51, width: 0.36 } }" />
-<DrawnAnnotation text="shouldBe" />
-
-```kotlin
-import io.kotest.matchers.shouldBe
-import io.ktor.client.request.get
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.testing.testApplication
-import org.junit.jupiter.api.Test
-
-class GreetingTest {
-  @Test
-  fun bye() = testApplication {
-    application { module() }
-    val response = client.get("/greet/alex/bye")
-    response.status shouldBe HttpStatusCode.OK
-  }
-}
-```
-
-<!--
-Testing a web server means starting it, sending requests with a client,
-checking the answers. Ktor controls both ends, so `testApplication` runs
-the application on a test engine and hands out a client that calls it
-directly: fast, isolated, no free port needed. `application { }` is the
-module, `createClient { }` builds more clients. Kotest's `shouldBe` is a
-matcher; the runner is JUnit 5, `@Test` from `org.junit.jupiter.api`.
-Mind the imports: there is a `get` for routes and a `get` for the
-client; the IDE offers both.
--->
-
----
-
-# A helper owns the set-up
-
-<DrawnAnnotation text="createClient {" label="A client with plug-ins: JSON bodies, as in lesson 5" :geometry="{ label: { x: 0.72, y: 0.29, width: 0.44 } }" />
-<DrawnAnnotation text="test(client)" label="The test receives the client and nothing else" :geometry="{ label: { x: 0.76, y: 0.48, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.testing.testApplication
-
-fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
-  application { module() }
-  val client = createClient {
-    install(ContentNegotiation) { json() }
-  }
-  test(client)
-}
-```
-
-<!--
-Every test starts the same application and wants the same client; the
-plug-ins are the client-side ones, `io.ktor.client.plugins`, the same
-artifacts as lesson 5. One function, and every test is its body.
--->
-
----
-magic-move
----
-
-# A helper owns the set-up
-
-<DrawnAnnotation text="expectSuccess = true" label="Any `4xx` or `5xx` throws: the test fails without an assertion" :geometry="{ label: { x: 0.74, y: 0.43, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.testing.testApplication
-
-fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
-  application { module() }
-  val client = createClient {
-    install(ContentNegotiation) { json() }
-    expectSuccess = true
-  }
-  test(client)
-}
-```
-
-<!--
-`expectSuccess` decides whether a failure status is a value to inspect or
-an exception to raise: `ClientRequestException` for `4xx`,
-`ServerResponseException` for `5xx`. For a test that expects the `404`,
-build a second client without it, or check `response.status` on the
-default one.
--->
-
----
-
-# The test is only the test
-
-<DrawnAnnotation text="&quot;/greet/alex/bye&quot;" label="The URL is the whole request: the helper owns everything else" :geometry="{ label: { x: 0.72, y: 0.5, width: 0.44 } }" />
-
-```kotlin
-import io.kotest.matchers.shouldBe
-import io.ktor.client.request.get
-import io.ktor.http.HttpStatusCode
-import org.junit.jupiter.api.Test
-
-@Test
-fun bye() = appTest { client ->
-  client.get("/greet/alex/bye").status shouldBe HttpStatusCode.OK
-}
-```
-
-<!--
-Still inside `GreetingTest`. No set-up in sight: the helper owns it, the
-test states the request and the expectation. A renamed route shows up
-here as a `404`, and `expectSuccess` turns that into a failing test.
--->
-
----
-
-# Generated input finds the corner cases
-
-> Properties instead of examples: any name should get a goodbye
-
-<DrawnAnnotation text="checkAll(Arb.string())" label="Kotest runs the block a thousand times: empty, long, and odd strings first" :geometry="{ label: { x: 0.72, y: 0.7, width: 0.44 } }" />
-<DrawnAnnotation text="encodeURLPathPart()" label="A generated name may contain `/` or `?`: encode it as one segment" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
-
-```kotlin
-import io.kotest.matchers.shouldBe
-import io.kotest.property.Arb
-import io.kotest.property.arbitrary.string
-import io.kotest.property.checkAll
-import io.ktor.client.request.get
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.encodeURLPathPart
-import org.junit.jupiter.api.Test
-
-@Test
-fun anyName() = appTest { client ->
-  checkAll(Arb.string()) { name ->
-    val response = client.get("/greet/${name.encodeURLPathPart()}/bye")
-    response.status shouldBe HttpStatusCode.OK
-  }
-}
-```
-
-<!--
-Property-based testing states a rule over all inputs instead of one
-example, generates the data, and runs the rule many times; good
-frameworks try the edge cases first and shrink a failure to the smallest
-input that still fails. A server does not choose its requests: strange
-encodings, empty and enormous strings, surprising JSON. This test finds
-one straight away: the empty name gives `/greet//bye`, a `404`, and
-`expectSuccess` turns it into a failure. Decide whether that is a bug or
-a constraint, `Arb.string(minSize = 1)`, and you have learned something
-about your API. `kotest-property` is the artifact; `Arb` has generators
-for every basic type and combinators to build your own.
--->
-
----
-
-# The client forgets cookies unless told
-
-> Sessions from lesson 4, logins from lesson 8: the state lives in a cookie
-
-<DrawnAnnotation text="install(HttpCookies)" label="Keeps every `Set-Cookie` and sends it back: a login test can span requests" :geometry="{ label: { x: 0.72, y: 0.54, width: 0.44 } }" />
-
-```kotlin
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.cookies.HttpCookies
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.testing.testApplication
-
-fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
-  application { module() }
-  val client = createClient {
-    install(ContentNegotiation) { json() }
-    install(HttpCookies)
-    expectSuccess = true
-  }
-  test(client)
-}
-```
-
-<!--
-By default every request from the client is independent, which is what
-you want until the test logs in first and then asks for a protected page.
-`HttpCookies`, `io.ktor.client.plugins.cookies`, adds a cookie jar; the
-`bearerAuth` and `basicAuth` request helpers cover token-based schemes.
--->
-
----
-
-# Other services are mocked in the test
-
-<DrawnAnnotation text="hosts(&quot;https://api.github.com&quot;)" label="A whole `Application` playing GitHub: routes, plug-ins, failures on demand" :geometry="{ label: { x: 0.72, y: 0.28, width: 0.44 } }" />
-<DrawnAnnotation text="install(ServerContentNegotiation)" label="The server plug-in under an alias: the client's has the same name" :geometry="{ label: { x: 0.74, y: 0.53, width: 0.4 } }" />
-<DrawnAnnotation text="GitHubHttp(client())" label="`HttpClient(CIO)` leaves the process: the mock never sees this request" color="red" :geometry="{ label: { x: 0.72, y: 0.79, width: 0.44 } }" />
-
-```kotlin
-import io.kotest.matchers.shouldBe
-import io.ktor.client.request.get
-import io.ktor.http.HttpStatusCode
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.install
-import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
-import io.ktor.server.response.respond
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
-import io.ktor.server.testing.testApplication
-import org.junit.jupiter.api.Test
-
-@Test
-fun profile() = testApplication {
-  externalServices {
-    hosts("https://api.github.com") {
-      install(ServerContentNegotiation) { json() }
-      routing { get("/users/{u}") { call.respond(User("Alex", null, null)) } }
-    }
-  }
-  application { module(GitHubHttp(client())) }
-  client.get("/github/alex").status shouldBe HttpStatusCode.OK
-}
-```
-
-<!--
-Two ways to test code that talks to another service: run the real thing
-locally, Testcontainers manages the lifecycle of a database or a queue in
-Docker; or mock it. `externalServices` is the mock: every host listed
-gets an `Application` of its own, served by the test engine, so a `500`
-or a slow answer is one route away. The catch: only a client from this
-`testApplication` resolves those hosts. `GitHubHttp(client())` builds
-lesson 5's real `HttpClient(CIO)`, and that one goes to the internet.
--->
-
----
-magic-move
----
-
-# Other services are mocked in the test
-
-<DrawnAnnotation text="defaultRequest { url(&quot;https://api.github.com&quot;) }" label="A test client, so the mock answers; the base URL completes the relative paths" :geometry="{ label: { x: 0.8, y: 0.6, width: 0.28 } }" />
-<DrawnAnnotation text="module(GitHubHttp(github))" label="The service gets the test client: lesson 5's DI, done by the test" :geometry="{ label: { x: 0.8, y: 0.76, width: 0.28 } }" />
-
-```kotlin
-import io.kotest.matchers.shouldBe
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.client.request.get
-import io.ktor.http.HttpStatusCode
-import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.install
-import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
-import io.ktor.server.response.respond
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
-import io.ktor.server.testing.testApplication
-import org.junit.jupiter.api.Test
-
-@Test
-fun profile() = testApplication {
-  externalServices {
-    hosts("https://api.github.com") {
-      install(ServerContentNegotiation) { json() }
-      routing { get("/users/{u}") { call.respond(User("Alex", null, null)) } }
-    }
-  }
-  val github = createClient {
-    install(ContentNegotiation) { json() }
-    defaultRequest { url("https://api.github.com") }
-  }
-  application { module(GitHubHttp(github)) }
-  client.get("/github/alex").status shouldBe HttpStatusCode.OK
-}
-```
-
-<!--
-The module takes the service as a parameter, the interface from lesson
-5, so the test hands it an implementation built on a test client. The
-mock answers `/users/alex`; `/users/alex/repos` has no route, `404`, and
-`GitHubHttp` turns that into an empty list. Mocks are fast and can fail
-on command; they are also not the real thing, so keep one integration
-test against the real API, or a container, for the contract.
--->
-
----
-
-# The service is tested without a server
-
-<DrawnAnnotation text="MockEngine { request ->" label="`ktor-client-mock`: an engine that answers from a lambda, no socket" :geometry="{ label: { x: 0.74, y: 0.32, width: 0.46 } }" />
-<DrawnAnnotation text="GitHubHttp(client)" label="Lesson 5's implementation, alone: no `testApplication`, no routes" :geometry="{ label: { x: 0.47, y: 0.807, width: 0.7 } }" />
-<DrawnAnnotation text="runTest" label="`kotlinx-coroutines-test`: a `suspend` test body" :geometry="{ label: { x: 0.62, y: 0.242, width: 0.48 } }" />
-
-```kotlin
-import io.kotest.matchers.shouldBe
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.mock.MockEngine
-import io.ktor.client.engine.mock.respond
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
-import io.ktor.http.HttpHeaders
-import io.ktor.http.headersOf
-import io.ktor.serialization.kotlinx.json.json
-import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Test
-
-@Test
-fun userInfo() = runTest {
-  val engine = MockEngine { request ->
-    respond(
-      content = """{"name": "Alex", "bio": null, "avatar_url": null}""",
-      headers = headersOf(HttpHeaders.ContentType, "application/json"),
-    )
-  }
-  val client = HttpClient(engine) {
-    install(ContentNegotiation) { json() }
-    defaultRequest { url("https://api.github.com") }
-  }
-  GitHubHttp(client).getUserInfo("alex")?.name shouldBe "Alex"
-}
-```
-
-<!--
-The other unit: `externalServices` tests the route and the service
-together, `MockEngine` tests the service and nothing else. The engine is
-the client's lowest layer, so every plug-in above it, `ContentNegotiation`
-included, runs for real; `request.url.encodedPath` in the lambda
-branches on the path, `respondError(HttpStatusCode.NotFound)` plays a
-missing user. Both mocks are fast and both lie a little; the contract
-test against GitHub stays.
--->
-
----
-
-# Metrics are a plug-in with a registry
-
-> Which routes are hit, how long they take, how often they fail
-
-<DrawnAnnotation text="PrometheusMeterRegistry" label="One registry per back-end: Prometheus here, JMX or Datadog are another artifact" :geometry="{ label: { x: 0.72, y: 0.4, width: 0.44 } }" />
-<DrawnAnnotation text="install(MicrometerMetrics)" label="`ktor-server-metrics-micrometer`: a timer per request, tagged with route and status" :geometry="{ label: { x: 0.72, y: 0.54, width: 0.44 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.metrics.micrometer.MicrometerMetrics
-import io.micrometer.prometheusmetrics.PrometheusConfig
-import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
-
-val prometheus = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-
-fun Application.module() {
-  install(MicrometerMetrics) {
-    registry = prometheus
-  }
-  routes()
-}
-```
-
-<!--
-A clear picture of how a service is used: when does it crash, which
-endpoints carry the load, which operations are slow. Micrometer is the
-facade, like SLF4J for logging: the code records timers, counters,
-gauges, and distributions against a `MeterRegistry`, and the registry
-implementation decides where they go. `micrometer-registry-prometheus`
-1.13+ moved the classes to `io.micrometer.prometheusmetrics`. The
-plug-in also registers JVM memory, GC, and CPU meters by default.
--->
-
----
-magic-move
----
-
-# Metrics are a plug-in with a registry
-
-> Which routes are hit, how long they take, how often they fail
-
-<DrawnAnnotation text="prometheus.scrape()" label="Every metric as text, in the format Prometheus reads" :geometry="{ label: { x: 0.76, y: 0.59, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.metrics.micrometer.MicrometerMetrics
-import io.ktor.server.response.respond
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
-import io.micrometer.prometheusmetrics.PrometheusConfig
-import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
-
-val prometheus = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-
-fun Application.module() {
-  install(MicrometerMetrics) {
-    registry = prometheus
-  }
-  routing {
-    get("/metrics") { call.respond(prometheus.scrape()) }
-  }
-  routes()
-}
-```
-
-<!--
-Prometheus pulls: it does not receive metrics, it fetches them from an
-endpoint on a schedule. `scrape()` renders the registry in its text
-format, and a route serves it. Hide it from the OpenAPI document with
-`.hide()`, and from the internet with a separate port or the auth of
-lesson 8.
--->
-
----
-
-# The scrape is plain text
-
-<DrawnAnnotation text="ktor_http_server_requests_seconds_count" label="One timer per route and status: count, sum, max; Prometheus derives the rates" :geometry="{ label: { x: 0.78, y: 0.39, width: 0.32 } }" />
-<DrawnAnnotation text="status=&quot;500&quot;" label="Status is a tag: errors are a query, not another metric" :geometry="{ label: { x: 0.72, y: 0.72, width: 0.44 } }" />
+<DrawnAnnotation text="WEBSOCKET ws://localhost:8080/greet" label="Not `GET`: the client performs the upgrade and keeps the connection" :geometry="{ label: { x: 0.6368, y: 0.3719, width: 0.4000 } }" />
+<DrawnAnnotation text="=== wait-for-server" label="Each message is one frame; wait for the reply before sending the next" :geometry="{ label: { x: 0.4950, y: 0.5272, width: 0.4000 } }" />
 
 ```http
-GET /metrics HTTP/1.1
+WEBSOCKET ws://localhost:8080/greet
+
+Alex
+=== wait-for-server
+Kodee
+```
+
+<!--
+There are many clients: the browser console with `new WebSocket("ws://…")`,
+`wscat`, Postman. IntelliJ IDEA's HTTP client, despite its name, does
+WebSockets too: the same `.http` files as lesson 3, `WEBSOCKET` instead of
+a method, one message per block. `Hello, Alex` and `Hello, Kodee` come
+back in the response panel.
+-->
+
+---
+
+# JSON frames need a converter
+
+<DrawnAnnotation text="Response(val greeting: String)" label="The `@Serializable` classes of lesson 3, one per frame" :geometry="{ label: { x: 0.7620, y: 0.2442, width: 0.2400 } }" />
+<DrawnAnnotation text="contentConverter" label="Not `ContentNegotiation`: a frame has no `Content-Type`, you pick the format" :geometry="{ label: { x: 0.4137, y: 0.5304, width: 0.4400 } }" />
+
+```kotlin
+import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.websocket.WebSockets
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+@Serializable data class Request(val name: String)
+@Serializable data class Response(val greeting: String)
+
+fun Application.module() {
+  install(WebSockets) {
+    contentConverter = KotlinxWebsocketSerializationConverter(Json)
+  }
+  routes()
+}
+```
+
+<!--
+Most message exchanges are JSON. There is no negotiation on a socket: the
+frame is text or binary and nothing says which format is inside, so the
+converter is fixed at install time. `KotlinxWebsocketSerializationConverter`
+comes with `ktor-serialization-kotlinx-json`, the artifact lesson 3 already
+added; the `Json` instance can be the same configured one.
+-->
+
+---
+
+# Typed frames are read one at a time
+
+<DrawnAnnotation text="receiveDeserialized<Request>()" label="Suspends until the next frame and decodes it; `while (true)` is the loop now" :geometry="{ label: { x: 0.74, y: 0.25, width: 0.4 } }" />
+<DrawnAnnotation text="sendSerialized(" label="Encodes one object into one text frame" :geometry="{ label: { x: 0.74, y: 0.49, width: 0.4 } }" />
+
+```kotlin
+import io.ktor.server.routing.Route
+import io.ktor.server.websocket.receiveDeserialized
+import io.ktor.server.websocket.sendSerialized
+import io.ktor.server.websocket.webSocket
+
+fun Route.greet() {
+  webSocket("/greet") {
+    while (true) {
+      val req = receiveDeserialized<Request>()
+      sendSerialized(Response("Hello, ${req.name}"))
+    }
+  }
+}
+```
+
+<!--
+`receiveDeserialized` and `sendSerialized` use the converter from the
+plug-in; a frame that does not parse throws `WebsocketDeserializeException`
+with the offending frame attached. The `for` over `incoming` is gone, so
+the loop has to be explicit, and so does its end: the next two slides.
+`routing { greet() }` registers this route.
+-->
+
+---
+magic-move
+---
+
+# Typed frames are read one at a time
+
+<DrawnAnnotation text="ClosedReceiveChannelException" label="The client closed the socket: `incoming` ends and the read throws" :geometry="{ label: { x: 0.72, y: 0.66, width: 0.4 } }" />
+
+```kotlin
+import io.ktor.server.routing.Route
+import io.ktor.server.websocket.receiveDeserialized
+import io.ktor.server.websocket.sendSerialized
+import io.ktor.server.websocket.webSocket
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
+
+fun Route.greet() {
+  webSocket("/greet") {
+    try {
+      while (true) {
+        val req = receiveDeserialized<Request>()
+        sendSerialized(Response("Hello, ${req.name}"))
+      }
+    } catch (e: ClosedReceiveChannelException) {
+      // the client closed the socket
+    }
+  }
+}
+```
+
+<!--
+`incoming` is a `ReceiveChannel`; reading from a closed channel throws
+`ClosedReceiveChannelException`. That is the normal end of a conversation,
+not an error, so the catch is empty: the handler returns and Ktor finishes
+the close handshake.
+-->
+
+---
+magic-move
+---
+
+# Typed frames are read one at a time
+
+<DrawnAnnotation text="CancellationException" label="The server is shutting down: send a close frame with a reason, then let it through" :geometry="{ label: { x: 0.7, y: 0.8, width: 0.44 } }" />
+<DrawnAnnotation text="throw e" />
+
+```kotlin
+import io.ktor.server.routing.Route
+import io.ktor.server.websocket.receiveDeserialized
+import io.ktor.server.websocket.sendSerialized
+import io.ktor.server.websocket.webSocket
+import io.ktor.websocket.CloseReason
+import io.ktor.websocket.close
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
+
+fun Route.greet() {
+  webSocket("/greet") {
+    try {
+      while (true) {
+        val req = receiveDeserialized<Request>()
+        sendSerialized(Response("Hello, ${req.name}"))
+      }
+    } catch (e: ClosedReceiveChannelException) {
+      // the client closed the socket
+    } catch (e: CancellationException) {
+      close(CloseReason(CloseReason.Codes.GOING_AWAY, "Shutting down"))
+      throw e
+    }
+  }
+}
+```
+
+<!--
+The handler is a coroutine: when the server stops, it is cancelled and the
+suspended `receiveDeserialized` throws `CancellationException`. Catching
+it is the moment to say goodbye properly, `GOING_AWAY` is the code for a
+server leaving; `SERVICE_RESTART` and `NORMAL` exist too. Always rethrow:
+swallowing a `CancellationException` keeps a dead coroutine alive. For a
+guaranteed close frame wrap the `close` in `withContext(NonCancellable)`.
+-->
+
+---
+
+# Server-Sent Events go one way
+
+> Half a WebSocket: the server pushes, the client listens
+
+<DrawnAnnotation text="install(SSE)" label="`ktor-server-sse`: a `GET` whose response never ends" :geometry="{ label: { x: 0.52, y: 0.352, width: 0.52 } }" />
+<DrawnAnnotation text="sse(&quot;/countdown&quot;)" label="A route like `get`; the block runs until it returns or the client leaves" :geometry="{ label: { x: 0.5799, y: 0.4515, width: 0.5000 } }" />
+<DrawnAnnotation text="send(ServerSentEvent(&quot;$n&quot;))" label="One `data:` line per event; `event`, `id` and `retry` are optional" :geometry="{ label: { x: 0.4847, y: 0.6322, width: 0.4800 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.routing.routing
+import io.ktor.server.sse.SSE
+import io.ktor.server.sse.sse
+import io.ktor.sse.ServerSentEvent
+import kotlinx.coroutines.delay
+
+fun Application.module() {
+  install(SSE)
+  routing {
+    sse("/countdown") {
+      for (n in 10 downTo 1) {
+        send(ServerSentEvent("$n"))
+        delay(1000)
+      }
+    }
+  }
+}
+```
+
+<!--
+Progress bars, notifications, a stream of tokens from a model: the
+client has nothing to say back, so a WebSocket is more than it needs.
+Server-Sent Events are a `text/event-stream` response over plain HTTP
+that stays open, one event per block; proxies and load balancers see an
+ordinary request. `heartbeat { }` keeps an idle connection from being
+dropped, `sse(path, serialize = …)` sends `@Serializable` objects as
+JSON, and `ktor-client-sse` is the client side.
+-->
+
+---
+
+# The stream is plain text
+
+<DrawnAnnotation text="text/event-stream" label="The browser's `EventSource` reads this; the connection stays open" :geometry="{ label: { x: 0.5590, y: 0.2417, width: 0.4600 } }" />
+<DrawnAnnotation text="data: 10" label="One event, ended by a blank line: `onmessage` fires per block" :geometry="{ label: { x: 0.2869, y: 0.3758, width: 0.5000 } }" />
+
+```http
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+
+data: 10
+
+data: 9
+```
+
+<!--
+`new EventSource("/countdown").onmessage = e => …` in any browser, no
+library. The client reconnects on its own when the connection drops and
+sends `Last-Event-ID` with the `id` of the last event it saw, so a
+server that numbers its events can resume where it left off. `event:`
+names a type that `addEventListener` filters on; `retry:` tells the
+browser how long to wait before reconnecting.
+-->
+
+---
+
+# OpenAPI describes every endpoint
+
+> One JSON document: every path, parameter, and response; clients, docs, and tests are generated from it
+
+| `get("/greet/{name}")`              | inferred from the routing tree                      |
+|-------------------------------------|-----------------------------------------------------|
+| `call.respond(GreetingResponse(…))` | inferred from the handler: a `200` with that schema |
+| `/** Path: name [String] … */`      | a comment the compiler extension reads              |
+| `.describe { }`                     | attached at runtime; wins over the other two        |
+
+<!--
+OpenAPI, formerly Swagger, is the specification for describing REST
+services; tooling exists in almost every language to generate clients,
+server stubs, and documentation from it. Writing it by hand drifts from
+the code. Ktor 3.5 builds it from the routing tree: what the compiler can
+infer, what a comment adds, and what a `describe` block overrides, merged
+in that order of precedence.
+-->
+
+---
+
+# The compiler extension reads your routes
+
+<DrawnAnnotation text="codeInferenceEnabled = true" label="Reads `call.parameters`, `call.receive<T>()`,\n`call.respond(…)` inside handlers"  :geometry="{ label: { x: 0.5086, y: 0.6062 } }"/>
+
+```kotlin gradle no-compile
+plugins {
+  id("io.ktor.plugin") version "3.6.0"
+}
+
+ktor {
+  openApi {
+    enabled = true
+    codeInferenceEnabled = true
+  }
+}
+```
+
+<!--
+The extension runs at compile time and generates Kotlin that registers
+the metadata at start-up; nothing is inspected by reflection. It needs
+Kotlin 2.4.0 or newer: on an older compiler the Gradle plug-in skips the
+extension with a warning and the document stays empty. `enabled = true`
+adds `ktor-server-routing-openapi`, the runtime metadata API, for you;
+`ktor-server-openapi` and `ktor-server-swagger` serve the document.
+Inference follows extracted handler functions where it can; `// ignore!`
+above a route excludes it when inference gets it wrong.
+-->
+
+---
+
+# A comment documents the route
+
+<DrawnAnnotation text="Greet a person by name." label="The text before the first keyword is the summary; the extension turns the comment into metadata" on="0" :geometry="{ label: { x: 0.5323, y: 0.2980, width: 0.4000 } }" />
+<DrawnAnnotation text="name: String by" label="Inferred: `name` is a path parameter" on="1" :geometry="{ label: { x: 0.6796, y: 0.4336, width: 0.4157 } }" />
+<DrawnAnnotation text="call.respond(GreetingResponse(" label="Inferred: a `200` whose schema is `GreetingResponse`" on="2" :geometry="{ label: { x: 0.4941, y: 0.5630, width: 0.5254 } }" />
+
+```kotlin
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.util.getValue
+
+fun Route.greeting() {
+  /**
+   * Greet a person by name.
+   */
+  get("/greet/{name}") {
+    val name: String by call.parameters
+    call.respond(GreetingResponse("Hello, $name"))
+  }
+}
+```
+
+<!--
+A KDoc comment right above the route call. The structure comes from the
+routing DSL: `GET`, `/greet/{name}`; the schema of the response from the
+`call.respond` the compiler sees; the prose from the comment. Nothing on
+this slide is Ktor-specific syntax yet, it is documentation you would have
+written anyway.
+-->
+
+---
+magic-move
+---
+
+# A comment documents the route
+
+<DrawnAnnotation text="Path: name [String] the person to greet" label="Keyword, colon, name, type, description; `Query:`, `Header:`, `Body:` follow the same shape" :geometry="{ label: { x: 0.7193, y: 0.3172, width: 0.4000 } }" />
+
+```kotlin
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.util.getValue
+
+fun Route.greeting() {
+  /**
+   * Greet a person by name.
+   * Path: name [String] the person to greet
+   */
+  get("/greet/{name}") {
+    val name: String by call.parameters
+    call.respond(GreetingResponse("Hello, $name"))
+  }
+}
+```
+
+<!--
+A keyword at the start of a line, a colon, then the value. `Path`,
+`Query`, `Header`, `Cookie` describe parameters; `Body: application/json
+[Type] description` the request body; `Tag`, `Deprecated`, `Description`,
+`Security`, `ExternalDocs` the rest. Plural forms with bullet lists are
+accepted too: `Responses:` followed by `- 200 …` lines.
+-->
+
+---
+magic-move
+---
+
+# A comment documents the route
+
+<DrawnAnnotation text="Response: 200 [GreetingResponse]" label="Status, then the body type in brackets; the `400` has no body" :geometry="{ label: { x: 0.72, y: 0.5, width: 0.4 } }" />
+
+```kotlin
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.util.getValue
+
+fun Route.greeting() {
+  /**
+   * Greet a person by name.
+   * Path: name [String] the person to greet
+   * Response: 400 The name is missing.
+   * Response: 200 [GreetingResponse] The greeting.
+   */
+  get("/greet/{name}") {
+    val name: String by call.parameters
+    call.respond(GreetingResponse("Hello, $name"))
+  }
+}
+```
+
+<!--
+`Response: code contentType [Type] description`; the content type is
+optional and defaults to JSON. The `200` schema was already inferred from
+`call.respond`, the comment adds its description; the `400` the compiler
+could not know about, `return@get call.respond(HttpStatusCode.BadRequest)`
+is a status without a body.
+-->
+
+---
+
+# `describe` documents at runtime
+
+<DrawnAnnotation text="@OptIn(ExperimentalKtorApi::class)" />
+<DrawnAnnotation text=".describe {" label="describe > Kdoc > inference" on="0" :geometry="{ label: { x: 0.6951, y: 0.2996, width: 0.4000 } }" />
+<DrawnAnnotation text="query(&quot;lang&quot;)" label="Parameters, body, responses: the DSL mirrors the OpenAPI Operation object" on="1" :geometry="{ label: { x: 0.4508, y: 0.5019, width: 0.4000 } }" />
+<DrawnAnnotation text="jsonSchema<GreetingResponse>()" label="The schema from the `@Serializable` descriptor; `@JsonSchema.Description` refines it" on="2" :geometry="{ label: { x: 0.4173, y: 0.7637, width: 0.4400 } }" />
+
+```kotlin
+import io.ktor.http.HttpStatusCode
+import io.ktor.openapi.jsonSchema
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.openapi.describe
+import io.ktor.utils.io.ExperimentalKtorApi
+
+@OptIn(ExperimentalKtorApi::class)
+fun Route.greeting(): Route =
+  get("/greet/{name}") { greet() }.describe {
+    summary = "Greet a person by name"
+    parameters {
+      query("lang") { description = "Language of the greeting" }
+    }
+    responses {
+      HttpStatusCode.OK {
+        description = "The greeting"
+        schema = jsonSchema<GreetingResponse>()
+      }
+    }
+  }
+```
+
+<!--
+`ktor-server-routing-openapi`, `io.ktor.server.routing.openapi.describe`,
+experimental in 3.5 so it needs the opt-in. `describe` returns the route,
+so it chains after `get`; it is the tool for what the compiler cannot see:
+routes built in a loop, interceptors, conditions. The same field set by
+several sources resolves to the runtime value; fields nobody overrides
+are kept and merged. Schemas come from the kotlinx.serialization
+descriptor by default; `ReflectionJsonSchemaInference` exists for Jackson
+and Gson models.
+-->
+
+---
+
+# Two routes serve the document
+
+<DrawnAnnotation text="openAPI(&quot;/openapi&quot;)" label="`ktor-server-openapi`: HTML documentation rendered from the document at start-up" :geometry="{ label: { x: 0.6817, y: 0.2428, width: 0.4000 } }" />
+<DrawnAnnotation text="OpenApiDocSource.Routing(" label="Assembled from the routing tree: inference, comments, and `describe` merged" :geometry="{ label: { x: 0.4129, y: 0.4714, width: 0.4400 } }" />
+
+```kotlin
+import io.ktor.http.ContentType
+import io.ktor.openapi.OpenApiInfo
+import io.ktor.server.application.Application
+import io.ktor.server.plugins.openapi.openAPI
+import io.ktor.server.routing.openapi.OpenApiDocSource
+import io.ktor.server.routing.routing
+
+fun Application.routes() {
+  routing {
+    openAPI("/openapi") {
+      info = OpenApiInfo("Greeting API", "1.0.0")
+      source = OpenApiDocSource.Routing(ContentType.Application.Json)
+    }
+  }
+}
+```
+
+<!--
+`info` is what the compiler cannot know: title, version, servers,
+security schemes. The default `source` looks for
+`openapi/documentation.yaml` in the resources first and falls back to the
+routing tree, so a hand-written specification still works. `openAPI` runs
+`swagger-codegen` at start-up and serves the static HTML it produced;
+the documented routes are registered in this same `routing` block.
+Since 3.5.2 it warns at start-up that `swagger-codegen` only officially
+supports OpenAPI 3.0.x while the routing source emits 3.1.1: the HTML
+may be incomplete, Swagger UI is the one to rely on.
+-->
+
+---
+magic-move
+---
+
+# Two routes serve the document
+
+<DrawnAnnotation text="swaggerUI(&quot;/swagger&quot;)" label="`ktor-server-swagger`: the document as JSON at `/swagger/openapi.json`, plus the UI that reads it" :geometry="{ label: { x: 0.4082, y: 0.7184, width: 0.4000 } }" />
+
+```kotlin
+import io.ktor.http.ContentType
+import io.ktor.openapi.OpenApiInfo
+import io.ktor.server.application.Application
+import io.ktor.server.plugins.openapi.openAPI
+import io.ktor.server.plugins.swagger.swaggerUI
+import io.ktor.server.routing.openapi.OpenApiDocSource
+import io.ktor.server.routing.routing
+
+fun Application.routes() {
+  routing {
+    openAPI("/openapi") {
+      info = OpenApiInfo("Greeting API", "1.0.0")
+      source = OpenApiDocSource.Routing(ContentType.Application.Json)
+    }
+    swaggerUI("/swagger") {
+      info = OpenApiInfo("Greeting API", "1.0.0")
+      source = OpenApiDocSource.Routing(ContentType.Application.Json)
+      remotePath = "openapi.json"
+    }
+  }
+}
+```
+
+<!--
+Swagger UI is the interactive one: try a route from the browser, see the
+schemas. It serves the document itself under `remotePath`, which
+defaults to `documentation.yaml` whatever the content type, so name it
+`openapi.json` when the source is JSON. Both
+plug-ins hide their own routes from the document.
+-->
+
+---
+magic-move
+---
+
+# Two routes serve the document
+
+<DrawnAnnotation text=".hide()" label="Kept out of the document; the two plug-ins hide their own routes the same way" :geometry="{ label: { x: 0.7190, y: 0.8434, width: 0.4400 } }" />
+
+```kotlin
+import io.ktor.http.ContentType
+import io.ktor.openapi.OpenApiInfo
+import io.ktor.server.application.Application
+import io.ktor.server.plugins.openapi.openAPI
+import io.ktor.server.plugins.swagger.swaggerUI
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.openapi.OpenApiDocSource
+import io.ktor.server.routing.openapi.hide
+import io.ktor.server.routing.routing
+import io.ktor.utils.io.ExperimentalKtorApi
+
+@OptIn(ExperimentalKtorApi::class)
+fun Application.routes() {
+  routing {
+    openAPI("/openapi") {
+      info = OpenApiInfo("Greeting API", "1.0.0")
+      source = OpenApiDocSource.Routing(ContentType.Application.Json)
+    }
+    swaggerUI("/swagger") {
+      info = OpenApiInfo("Greeting API", "1.0.0")
+      source = OpenApiDocSource.Routing(ContentType.Application.Json)
+      remotePath = "openapi.json"
+    }
+    get("/health") { call.respondText("ok") }.hide()
+  }
+}
+```
+
+<!--
+Health checks, admin endpoints, metrics: public in the server, absent
+from the published API. `hide` on a `route { }` hides its whole subtree.
+-->
+
+---
+
+# The document is JSON
+
+<DrawnAnnotation text="GET /swagger/openapi.json" label="The same document Swagger UI renders; `/openapi` is the HTML version" :geometry="{ label: { x: 0.5343, y: 0.2795, width: 0.4000 } }" />
+<DrawnAnnotation text="&quot;/greet/{name}&quot;" label="Every route, with what inference, the comment, and `describe` said about it" :geometry="{ label: { x: 0.3237, y: 0.7537, width: 0.4400 } }" />
+
+```http
+GET /swagger/openapi.json HTTP/1.1
 Host: localhost:8080
 
 HTTP/1.1 200 OK
-Content-Type: text/plain; charset=UTF-8
+Content-Type: application/json
 
-# TYPE ktor_http_server_requests_seconds summary
-ktor_http_server_requests_seconds_count{route="/health",status="200"} 42
-ktor_http_server_requests_seconds_sum{route="/health",status="200"} 0.213
-ktor_http_server_requests_seconds_count{route="/health",status="500"} 1
-```
-
-<!--
-Trimmed: every series also carries `address`, `method`, and `throwable`
-tags, and the JVM meters come before it. The name is Micrometer's
-`ktor.http.server.requests` with dots turned to underscores and the base
-unit appended. A Prometheus query such as
-`rate(ktor_http_server_requests_seconds_count[5m])` gives requests per
-second; `_sum / _count` the average latency.
--->
-
----
-
-# Prometheus pulls from `/metrics`
-
-> `prometheus.yml`, next to the `prometheus` binary; the UI is on `localhost:9090`
-
-<DrawnAnnotation text="job_name: &quot;ktor&quot;" label="The `job` label on every series from this server" :geometry="{ label: { x: 0.76, y: 0.36, width: 0.36 } }" />
-<DrawnAnnotation text="targets: [&quot;localhost:8080&quot;]" label="Scraped every 15 s, at `/metrics` by default" :geometry="{ label: { x: 0.76, y: 0.5, width: 0.36 } }" />
-
-```yaml
-scrape_configs:
-  - job_name: "ktor"
-    static_configs:
-      - targets: ["localhost:8080"]
-```
-
-<!--
-Download from `prometheus.io`, unpack, add the job, run `./prometheus`.
-The web UI at `localhost:9090` has the expression browser and graphs;
-Grafana usually sits on top for dashboards. `metrics_path` changes the
-endpoint, `scrape_interval` the cadence; in production the targets come
-from service discovery rather than a static list.
--->
-
----
-
-# Timers carry your tags
-
-<DrawnAnnotation text="timers { call, throwable ->" label="Runs per request on the `Timer.Builder`: route, method, status are already there" :geometry="{ label: { x: 0.72, y: 0.39, width: 0.44 } }" />
-<DrawnAnnotation text="call.request.headers[&quot;X-Premium&quot;]" label="A tag is a dimension: premium and free traffic side by side in one query" :geometry="{ label: { x: 0.72, y: 0.53, width: 0.44 } }" />
-
-<Warning :line="6" text="throwable" message="Parameter 'throwable' is never used, could be renamed to _">
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.metrics.micrometer.MicrometerMetrics
-import io.micrometer.prometheusmetrics.PrometheusConfig
-import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
-
-val prometheus = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-
-fun Application.module() {
-  install(MicrometerMetrics) {
-    registry = prometheus
-    timers { call, throwable ->
-      tag("premium", call.request.headers["X-Premium"] ?: "no")
-    }
-  }
-  routes()
-}
-```
-
-</Warning>
-
-<!--
-The block sees the call and the exception, if there was one, and may add
-tags to the request timer. Keep tags low-cardinality: a plan, a region, a
-client version. A user id or a request id as a tag creates one series per
-value and brings Prometheus to its knees; that is what logs and traces
-are for.
--->
-
----
-
-# Your own counters use the same registry
-
-<DrawnAnnotation text="registry: MeterRegistry" label="The Micrometer interface, not the Prometheus class: provided by DI, swapped in tests" :geometry="{ label: { x: 0.72, y: 0.45, width: 0.44 } }" />
-<DrawnAnnotation text="registry.counter(&quot;bye&quot;).increment()" label="Counters, gauges, timers, distributions: the whole Micrometer API" :geometry="{ label: { x: 0.76, y: 0.29, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.RoutingContext
-import io.micrometer.core.instrument.MeterRegistry
-
-suspend fun RoutingContext.bye(registry: MeterRegistry, name: String) {
-  registry.counter("bye").increment()
-  call.respondText("Bye, $name")
-}
-```
-
-<!--
-The request timer comes for free; business numbers are yours to record.
-A counter only goes up, goodbyes said; a gauge samples a value, users
-online; a timer records durations; a distribution summary any other
-number. `registry.counter("bye", "lang", lang)` adds tags. Behind an
-interface the metrics back-end is a detail: `SimpleMeterRegistry` in a
-test, Prometheus in production, both through `ktor-server-di`.
--->
-
----
-
-# Every application has a logger
-
-<DrawnAnnotation text="log.info(" label="`Application.log`: SLF4J, behind the generator's `logback.xml`" :geometry="{ label: { x: 0.73, y: 0.242, width: 0.46 } }" />
-<DrawnAnnotation text="call.application.log" label="The same logger from a handler" :geometry="{ label: { x: 0.84, y: 0.43, width: 0.32 } }" />
-<DrawnAnnotation text="&quot;{} is leaving&quot;, name" label="A placeholder, not a template: formatted only when the level is on" :geometry="{ label: { x: 0.73, y: 0.5, width: 0.5 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.log
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
-import io.ktor.server.util.getValue
-
-fun Application.module() {
-  log.info("Greetings module loaded")
-  routing {
-    get("/greet/{name}/bye") {
-      val name: String by call.pathParameters
-      call.application.log.warn("{} is leaving", name)
-      call.respondText("Bye, $name")
-    }
+{
+  "openapi": "3.1.1",
+  "info": { "title": "Greeting API", "version": "1.0.0" },
+  "paths": {
+    "/greet/{name}": { "get": { "summary": "Greet a person by name" } }
   }
 }
 ```
-```console
-INFO  Application - Greetings module loaded
-WARN  Application - alex is leaving
-```
 
 <!--
-The metrics say how often; the log says what happened. `log` is the
-SLF4J logger of the application, the same facade the whole JVM uses,
-and logback behind it is what the generator's `logback.xml` configures:
-levels per package, `io.ktor` at `INFO`, the format of a line. The
-`Logger` interface earlier in this lesson stood in for this one. Log
-with placeholders, never `"$name is leaving"`: the string is only built
-when `WARN` is enabled, and the arguments stay separate for a JSON
-encoder. `KtorSimpleLogger("name")` is the multiplatform variant.
+Trimmed: the real `get` object carries `parameters`, `responses` with
+their schemas under `components`, tags, and whatever else was described.
+OpenAPI is huge, every element can have a description, summary, example;
+the `describe` DSL exposes all of it, the comment keywords the common
+part. Feed this URL to any OpenAPI generator and you have a client.
 -->
 
 ---
 
-# `CallLogging` writes one line per request
+# Two-way messages, described APIs
 
-<DrawnAnnotation text="install(CallLogging)" label="`ktor-server-call-logging`: method, path, status, duration, after the response" :geometry="{ label: { x: 0.66, y: 0.242, width: 0.6 } }" />
-<DrawnAnnotation text="filter { call ->" label="Not the scrape: Prometheus every 15 seconds would drown the log" :geometry="{ label: { x: 0.55, y: 0.384, width: 0.7 } }" />
+- `webSocket("/greet") { incoming }` → one connection, many frames
+- `receiveDeserialized<T>()`, `sendSerialized(…)` → typed frames
+- `ClosedReceiveChannelException` → the client left; `close(…)` to leave
+- `sse("/…") { send(ServerSentEvent(…)) }` → one way, plain HTTP, `EventSource`
+- `/** Path: … Response: … */` → the compiler extension reads comments
+- `.describe { }`, `.hide()`, `swaggerUI` → the last word; two routes publish it
 
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.plugins.calllogging.CallLogging
-import io.ktor.server.request.path
-import org.slf4j.event.Level
-
-fun Application.module() {
-  install(CallLogging) {
-    level = Level.INFO
-    filter { call -> !call.request.path().startsWith("/metrics") }
-  }
-  routes()
-}
-```
-```console
-INFO  Application - 200 OK: GET - /greet/alex/bye in 3ms
-INFO  Application - 404 Not Found: GET - /nowhere in 1ms
-```
-
-<!--
-The access log, as a plug-in. One line per call after it completes, at
-the level you choose, for the calls the filter keeps. `format { call -> }`
-writes your own line; `mdc("user") { call -> … }` computes a value once
-per request and puts it in the MDC, the mapped diagnostic context, so
-every line logged while that request runs carries it, from any class.
-That is what the next slide uses.
--->
-
----
-magic-move
----
-
-# `CallId` correlates the lines
-
-<DrawnAnnotation text="header(HttpHeaders.XRequestId)" label="Reuse the caller's or the proxy's id, and echo it back" :geometry="{ label: { x: 0.72, y: 0.289, width: 0.5 } }" />
-<DrawnAnnotation text="generate(length = 12)" label="Otherwise mint one" :geometry="{ label: { x: 0.52, y: 0.336, width: 0.3 } }" />
-<DrawnAnnotation text="callIdMdc(&quot;call-id&quot;)" label="Into the MDC: `%X{call-id}` in `logback.xml` puts it on every line of the request" :geometry="{ label: { x: 0.66, y: 0.6, width: 0.6 } }" />
-
-```kotlin
-import io.ktor.http.HttpHeaders
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.plugins.callid.CallId
-import io.ktor.server.plugins.callid.callIdMdc
-import io.ktor.server.plugins.callid.generate
-import io.ktor.server.plugins.calllogging.CallLogging
-import io.ktor.server.request.path
-import org.slf4j.event.Level
-
-fun Application.module() {
-  install(CallId) {
-    header(HttpHeaders.XRequestId)
-    generate(length = 12)
-  }
-  install(CallLogging) {
-    level = Level.INFO
-    filter { call -> !call.request.path().startsWith("/metrics") }
-    callIdMdc("call-id")
-  }
-  routes()
-}
-```
-```console
-INFO  [k7d2m9x1q4z8] Application - alex is leaving
-INFO  [k7d2m9x1q4z8] Application - 200 OK: GET - /greet/alex/bye in 3ms
-```
-
-<!--
-A request touches several classes and, with lesson 5's client, several
-services; without an id the lines of one request are scattered between
-the lines of every other. `CallId` establishes one per call: taken from
-`X-Request-ID` when the caller or the proxy sent it, generated
-otherwise, and echoed in the response so the client can quote it. The
-MDC puts it on every log line, and `ktor-client-call-id` forwards it to
-the services this one calls. A metric is a tag, a log line has an id,
-and the step after that, one span per call across services, is the
-`ktor-server-opentelemetry` plug-in.
--->
-
----
-
-# Failures, tests, and numbers
-
-- `StatusPages { status(…), exception<T> { } }` → every failure, your page
-- `RequestValidation { validate<T> { } }` → a bad body is a `400`, with reasons
-- `createApplicationPlugin { transformBody { } }` → your own hook
-- `testApplication { }`, `MockEngine { }` → one process, or no server at all
-- `checkAll(Arb.string())`, `externalServices { }` → generated, mocked
-- `MicrometerMetrics`, `CallLogging`, `CallId` → numbers, lines, an id per request
-
-> **A failure is a response, a test is a call, a metric is a tag, a log line has an id.**
+> **The specification is the routing tree, written down.**
 >
-> Never the exception message; always the same pipeline.
+> Inference, then comments, then `describe`.
 
 ---
 layout: intro
@@ -1258,10 +745,9 @@ kodee: heart
 
 <div class="lesson-number">Exercise</div>
 
-# Handle, test, and measure the greetings
+# Echo JSON and publish the spec
 
-- Map `NotFound` and your own exception to HTML pages with `StatusPages`
-- Test the greeting routes with `testApplication` behind an `appTest` helper
-- Add a property test with `checkAll(Arb.string())` and decide what it finds
-- Expose `/metrics` with `MicrometerMetrics` and a Prometheus registry
-- Scrape it with a local Prometheus and graph requests per route
+- Add a `/chat` WebSocket route that echoes a `@Serializable` message with a timestamp
+- Talk to it from an `.http` file with `WEBSOCKET ws://localhost:8080/chat`
+- Enable the OpenAPI extension and document the greeting routes with KDoc
+- Serve Swagger UI at `/swagger`, `.hide()` the health check, and call a route from the browser

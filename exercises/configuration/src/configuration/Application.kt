@@ -1,37 +1,46 @@
 package configuration
 
 import io.ktor.server.application.Application
+import io.ktor.server.engine.embeddedServer
+import io.ktor.server.netty.Netty
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 
-/** `EngineMain` reads `application.yaml` and loads the modules it lists. */
-fun main(args: Array<String>): Unit =
-  io.ktor.server.netty.EngineMain.main(args)
-
-/** What the module needs from the file: the port it listens on and the JWT secret. */
-data class Settings(val port: Int, val jwtSecret: String)
+/*
+ * Exercise 2 / 3: the file as a type.
+ *
+ * Declare `@Serializable data class Config(val server: Server)` and
+ * `@Serializable data class Server(val host: String, val port: Int)`: one
+ * property per key of `application.yaml`, the same names. The tests do not
+ * compile until both exist.
+ */
 
 /**
- * Exercise 2 / 2: the module reads its own keys.
+ * Exercise 3 / 3: load the configuration before the server starts.
  *
- * `settings` builds a [Settings] from `environment.config`:
- * `property("ktor.deployment.port").getString().toInt()` and
- * `property("jwt.secret").getString()`. A missing key is an error at start-up,
- * not a `null` at the first request.
- *
- * The remaining steps of the exercise slide are not code: build the image
- * with `./gradlew buildImage`, run it with `./gradlew runDocker`, then start
- * it again with a different `PORT`. See README.md.
+ * `ApplicationConfig("application.yaml")` reads the file from the classpath
+ * and substitutes the `$VARIABLE` references; `getAs<Config>()` deserialises
+ * it with kotlinx.serialization. A missing key is an exception here, not a
+ * `null` at the first request.
  */
-fun Application.settings(): Settings = TODO()
+fun loadConfig(): Config = TODO()
 
-/** The module `application.yaml` lists: one route that shows what was read. */
-fun Application.module() {
-  val settings = settings()
+/** The module receives what it needs as an argument; nothing reads the file twice. */
+fun Application.module(config: Config) {
   routing {
     get("/") {
-      call.respondText("Greeting service on port ${settings.port}")
+      call.respondText("Greeting service on ${config.server.host}:${config.server.port}")
     }
   }
+}
+
+/** Load first, fail fast, then start from the loaded values. */
+fun main() {
+  val config = loadConfig()
+  embeddedServer(
+    Netty,
+    host = config.server.host,
+    port = config.server.port,
+  ) { module(config) }.start(wait = true)
 }

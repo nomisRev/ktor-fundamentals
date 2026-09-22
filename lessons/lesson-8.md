@@ -8,637 +8,139 @@ kodee: wave
 
 <div class="lesson-number">Lesson 8</div>
 
-# Authentication and authorization
+# Status pages, testing and metrics
 
-## Who is calling, what is allowed
+## Failures, tests, and numbers
 
 ---
 
-# Authentication says who, authorization says what
+# The default error page is not yours
 
-| Authentication | who is calling: a password, a token, an identity provider |
-|----------------|-----------------------------------------------------------|
-| Authorization  | what the caller may do: decided per route                 |
+> An unknown route, a missing login, an exception in a handler: each one is still a response
+
+<DrawnAnnotation text="404 Not Found" label="Ktor's default: the right status and an empty body, a blank page in the browser" :geometry="{ label: { x: 0.4871, y: 0.5305, width: 0.4400 } }" />
+
+```http
+GET /nowhere HTTP/1.1
+Host: localhost:8080
+
+HTTP/1.1 404 Not Found
+Content-Length: 0
+```
 
 <!--
-Two words that travel together and mean different things. Authentication
-establishes an identity: a username and password most of the time, a
-signed token between programs, or an identity provider such as Google or
-GitHub that vouches for the user. Authorization decides what that identity
-may do. In Ktor the first is a scheme, a value created once, the second is
-a block around routes that takes that value; the whole lesson is those
-two halves.
+Three kinds of failure reach the client: no route matched, `404`; a
+route refused the caller, `401` or `403`, lesson 9; a handler threw, and
+Ktor answers `500` with nothing in the body. The status is right every
+time, the page never is: a JSON API wants a JSON error, a website wants
+its own template. One plug-in owns all three cases.
 -->
 
 ---
 
-# The server challenges, the client answers
+# `StatusPages` rewrites the response
 
-<DrawnAnnotation text="401 Unauthorized" label="No credentials yet: the challenge names the scheme and the realm" :geometry="{ label: { x: 0.7, y: 0.336, width: 0.4 } }" />
-<DrawnAnnotation text="realm=&quot;Access to secrets&quot;" label="The browser opens its login prompt with this text" :geometry="{ label: { x: 0.74, y: 0.46, width: 0.36 } }" />
+<DrawnAnnotation text="install(StatusPages)" on="0" label="`ktor-server-status-pages`: one plug-in for every failure" :geometry="{ label: { x: 0.74, y: 0.22, width: 0.4 } }" />
+<DrawnAnnotation text="status(HttpStatusCode.NotFound)" label="Runs when a handler, or no handler, answers `404`; `Unauthorized` works the same" on="1" :geometry="{ label: { x: 0.7, y: 0.52, width: 0.44 } }" />
+<DrawnAnnotation text="call.respondHtml(status)" on="2" />
 
-```http
-GET /greet/alex/hello/9 HTTP/1.1
-Host: localhost:8080
-
-HTTP/1.1 401 Unauthorized
-WWW-Authenticate: Basic realm="Access to secrets"
-```
-
-<!--
-HTTP Basic is the oldest scheme and the simplest to understand: the first
-request carries nothing, the server refuses with `401` and states in
-`WWW-Authenticate` which scheme it accepts and for which realm. A browser
-turns that into the grey login dialog; `curl -u` and every HTTP client
-know the dance too.
--->
-
----
-magic-move
----
-
-# The server challenges, the client answers
-
-<DrawnAnnotation text="Basic YWxleDpzdXBlcnNlY3JldA==" label="`alex:supersecret` in base64: plain text unless the connection is TLS" color="red" :geometry="{ label: { x: 0.72, y: 0.69, width: 0.44 } }" />
-
-```http
-GET /greet/alex/hello/9 HTTP/1.1
-Host: localhost:8080
-
-HTTP/1.1 401 Unauthorized
-WWW-Authenticate: Basic realm="Access to secrets"
-```
-
-```http
-GET /greet/alex/hello/9 HTTP/1.1
-Host: localhost:8080
-Authorization: Basic YWxleDpzdXBlcnNlY3JldA==
-```
-
-<!--
-The client repeats the request with an `Authorization` header: the
-scheme, then `name:password` encoded in base64. Base64 is not encryption;
-anyone on the path reads the password, so Basic only makes sense over
-HTTPS. The browser remembers the credentials for the realm and sends the
-header again on every following request, which is why the user is asked
-once.
--->
-
----
-
-# A scheme is a value, not a name
-
-> Experimental in Ktor 3.6.0: `@OptIn(ExperimentalKtorApi::class)`
-
-<DrawnAnnotation text="basic<UserIdPrincipal>" label="`ktor-server-auth`: the principal type is part of the scheme" :geometry="{ label: { x: 0.72, y: 0.36, width: 0.44 } }" />
-<DrawnAnnotation text="&quot;auth&quot;" label="Still named: unique in the application, and in the logs" :geometry="{ label: { x: 0.74, y: 0.47, width: 0.4 } }" />
-<DrawnAnnotation text="realm = " label="Sent in `WWW-Authenticate`; the browser shows it in the prompt" :geometry="{ label: { x: 0.74, y: 0.58, width: 0.4 } }" />
+<TypeHint :line="2" receiver="StatusPagesConfig">
 
 ```kotlin
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.basic
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.statuspages.StatusPages
+import kotlinx.html.body
+import kotlinx.html.h1
 
-val basicAuth = basic<UserIdPrincipal>("auth") {
-  realm = "Access to secrets"
-}
-```
-
-<!--
-Ktor 3.6.0 adds a second authentication API next to the familiar
-`install(Authentication) { basic("auth") { } }`: a scheme is a value.
-`basic` is HTTP Basic, the type argument is the principal every route
-behind this scheme will get, and the name is still there because the
-logs and the mixed case, a classic `authenticate("auth")` around a typed
-route, refer to it. Both APIs are marked experimental together with the
-Kotlin context parameters they use; the opt-in is one compiler flag or an
-`@OptIn` per file. Nothing is protected yet: creating a scheme says how
-to authenticate, not where.
--->
-
----
-magic-move
----
-
-# A scheme is a value, not a name
-
-> Experimental in Ktor 3.6.0: `@OptIn(ExperimentalKtorApi::class)`
-
-<DrawnAnnotation text="validate { credentials ->" label="Runs on every request, with the decoded `name` and `password`" :geometry="{ label: { x: 0.74, y: 0.43, width: 0.4 } }" />
-<DrawnAnnotation text="UserIdPrincipal(credentials.name)" label="The principal the type argument promised: the built-in one carries a name" :geometry="{ label: { x: 0.76, y: 0.54, width: 0.4 } }" />
-<DrawnAnnotation text="null" label="Refused: the challenge is sent again" :geometry="{ label: { x: 0.72, y: 0.66, width: 0.3 } }" />
-
-<TypeHint :line="1" receiver="TypedBasicAuthConfig<UserIdPrincipal>">
-
-```kotlin
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.basic
-
-val basicAuth = basic<UserIdPrincipal>("auth") {
-  realm = "Access to secrets"
-  validate { credentials ->
-    if (credentials.password == "supersecret") {
-      UserIdPrincipal(credentials.name)
-    } else {
-      null
+fun Application.module() {
+  install(StatusPages) {
+    status(HttpStatusCode.NotFound) { call, status ->
+      call.respondHtml(status) {
+        body { h1 { +"Keep looking somewhere else" } }
+      }
     }
   }
+  routes()
 }
 ```
 
 </TypeHint>
 
 <!--
-`validate` receives a `UserPasswordCredential` and answers with the
-principal, the object that represents the caller for the rest of the
-request, or `null` to refuse. Any class can be the principal; the type
-argument fixes which one, and `UserIdPrincipal` is the convenient
-built-in. Ktor 2 asked principals to implement a `Principal` interface,
-Ktor 3 dropped that, and 3.6 moves the type into the scheme so the
-routes can rely on it.
+The plug-in intercepts a response with that status and lets you answer
+again: the same `call.respond` family as lesson 3, so JSON, HTML, or a
+redirect. `status` takes several codes at once; `unhandled { }` catches a
+call no route answered, which is the `404` case seen from the other
+side. Keep passing the status: `respondHtml { }` alone would answer `200`
+with the error page inside.
 -->
 
 ---
 magic-move
 ---
 
-# A scheme is a value, not a name
+# `StatusPages` rewrites the response
 
-> Experimental in Ktor 3.6.0: `@OptIn(ExperimentalKtorApi::class)`
-
-<DrawnAnnotation text="checkCredentials(it)" label="One function, shared by both schemes" :geometry="{ label: { x: 0.74, y: 0.383, width: 0.36 } }" />
-<DrawnAnnotation text="form<UserIdPrincipal>(&quot;auth-form&quot;)" label="The same credentials in a `POST` body: a login page instead of a prompt" :geometry="{ label: { x: 0.72, y: 0.52, width: 0.44 } }" />
-<DrawnAnnotation text="usernameField = &quot;username&quot;" label="The field names of the form" :geometry="{ label: { x: 0.74, y: 0.62, width: 0.3 } }" />
+<DrawnAnnotation text="statusFile(" label="Several codes, one template each, served from the classpath" :geometry="{ label: { x: 0.6427, y: 0.2839, width: 0.4000 } }" />
+<DrawnAnnotation text="&quot;static/error/#.html&quot;" label="`#` becomes the code: `401.html`, `404.html`" :geometry="{ label: { x: 0.4384, y: 0.5103, width: 0.3600 } }" />
 
 ```kotlin
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.basic
-import io.ktor.server.auth.form
-
-val basicAuth = basic<UserIdPrincipal>("auth") {
-  realm = "Access to secrets"
-  validate { checkCredentials(it) }
-}
-
-val formAuth = form<UserIdPrincipal>("auth-form") {
-  usernameField = "username"
-  passwordField = "password"
-  validate { checkCredentials(it) }
-}
-```
-
-<!--
-Most websites do not want the browser's dialog: they render a login page
-and receive the form. `form` reads the two fields from the body, and
-hands `validate` the same `UserPasswordCredential`, so the check is
-written once. Each scheme decides what a failure looks like: `basic`
-sends `401` with the challenge, `form` can redirect to the login page
-with `onUnauthorized`, a few slides on.
--->
-
----
-
-# Validation returns a principal or `null`
-
-> A password, a database, a directory: the same shape
-
-<DrawnAnnotation text="UserPasswordCredential" label="What `basic` and `form` decode: a `name` and a `password`" :geometry="{ label: { x: 0.32, y: 0.56, width: 0.4 } }" />
-<DrawnAnnotation text="UserIdPrincipal?" label="The scheme's principal type; `null` refuses" :geometry="{ label: { x: 0.76, y: 0.56, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.UserPasswordCredential
-
-fun checkCredentials(credentials: UserPasswordCredential): UserIdPrincipal? =
-  if (credentials.password == "supersecret") UserIdPrincipal(credentials.name)
-  else null
-```
-
-<!--
-Pulled out of the scheme, the validation is an ordinary function, so it
-can be tested, and it can do anything: compare against a hashed password
-in the database, call an identity service. The scheme does not care as
-long as it gets its principal type or `null`. `validate` is suspending,
-so the database call is welcome there.
--->
-
----
-magic-move
----
-
-# Validation returns a principal or `null`
-
-> A password, a database, a directory: the same shape
-
-<DrawnAnnotation text="ldapAuthenticate" label="`ktor-server-auth-ldap`: binds to the directory as that user, with that password" :geometry="{ label: { x: 0.34, y: 0.56, width: 0.44 } }" />
-<DrawnAnnotation text="&quot;cn=%s,dc=example&quot;" label="The user's distinguished name, `%s` is the login: ask your admin" :geometry="{ label: { x: 0.76, y: 0.56, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.UserPasswordCredential
-import io.ktor.server.auth.ldap.ldapAuthenticate
-
-fun checkCredentials(credentials: UserPasswordCredential): UserIdPrincipal? =
-  ldapAuthenticate(credentials, "ldap://localhost:389", "cn=%s,dc=example")
-```
-
-<!--
-LDAP, the Lightweight Directory Access Protocol, is how most organisations
-hold their accounts: Active Directory speaks it. `ldapAuthenticate` tries
-to bind to the server as the user; a successful bind is the proof, and the
-function returns a `UserIdPrincipal`, `null` otherwise. There is no typed
-LDAP scheme, and none is needed: this call inside a `validate` block is
-the whole integration. The DN format is the one thing you cannot guess:
-it depends on how the directory is laid out.
--->
-
----
-
-# `authenticateWith` takes the scheme, not its name
-
-<DrawnAnnotation text="authenticateWith(basicAuth)" label="The value from the top of the file; every route inside is challenged first" :geometry="{ label: { x: 0.72, y: 0.289, width: 0.42 } }" />
-<DrawnAnnotation text="get(&quot;/greet/{name}/hello&quot;)" label="Routes outside the block stay public" :geometry="{ label: { x: 0.74, y: 0.42, width: 0.36 } }" />
-
-```kotlin
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
-import io.ktor.server.auth.authenticateWith
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.routing
-import io.ktor.server.util.getValue
-
-fun Application.routes() {
-  routing {
-    authenticateWith(basicAuth) {
-      get("/greet/{name}/hello") {
-        val name: String by call.pathParameters
-        call.respondText("Hello, $name")
-      }
-    }
-  }
-}
-```
-
-<!--
-This is the authorization half: `authenticateWith` wraps a set of routes
-and takes the scheme that guards them. No `install(Authentication)`
-anywhere: the scheme registers itself the first time a route uses it. It
-is a route node like `route` or `get`, so it nests anywhere in the tree,
-inside a classic `authenticate("…")` block too, and a typo in a name is
-now a compile error instead of a start-up failure.
--->
-
----
-magic-move
----
-
-# The principal is typed and never `null`
-
-<DrawnAnnotation text="val user: UserIdPrincipal = call.principal" label="What `validate` returned, typed by the scheme: no cast, no `?`" :geometry="{ label: { x: 0.8, y: 0.383, width: 0.3 } }" />
-<DrawnAnnotation text="user.name" label="The name the login established, not the one in the URL" :geometry="{ label: { x: 0.74, y: 0.52, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.authenticateWith
-import io.ktor.server.auth.principal
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    authenticateWith(basicAuth) {
-      get("/greet/{name}/hello") {
-        val user: UserIdPrincipal = call.principal
-        call.respondText("Hello, ${user.name}")
-      }
-    }
-  }
-}
-```
-
-<!--
-Inside the block `call.principal` is a property whose type comes from the
-scheme: `basic<UserIdPrincipal>` guards this route, so this is a
-`UserIdPrincipal`, and it is not nullable, because the scheme refused
-every request that has no principal before the handler ran. The named
-API answered `call.principal<UserIdPrincipal>()` with a nullable: the
-type might not match, the route might be optional. The type annotation on
-`user` is for the slide; inference does the same. The path parameter
-says who the client claims to greet; the principal says who the client
-proved to be.
--->
-
----
-
-# The principal is typed and never `null`
-
-<InlineCompilerError text="principal" message="No context argument for 'authCtx: PrincipalContext<P>' found." :line="4">
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.principal
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    get("/greet/{name}/hello") {
-      val user: UserIdPrincipal = call.principal
-      call.respondText("Hello, ${user.name}")
-    }
-  }
-}
-```
-
-</InlineCompilerError>
-
-<!--
-Take the block away and the property is gone with it. `call.principal`
-is declared with a context parameter, `PrincipalContext<P>`, that only
-`authenticateWith` brings into scope, so a handler outside the block
-cannot ask for a principal that nobody established. That is the whole
-promise of the typed API: the compiler, not a `?.`, keeps the two halves
-of the lesson consistent.
--->
-
----
-
-# Optional means `principalOrNull`
-
-<DrawnAnnotation text="authenticateWithOptional(basicAuth)" label="Anonymous callers pass; wrong credentials still fail" :geometry="{ label: { x: 0.74, y: 0.289, width: 0.4 } }" />
-<DrawnAnnotation text="call.principalOrNull" label="The only accessor in this block: the type says a guest is possible" :geometry="{ label: { x: 0.78, y: 0.383, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.authenticateWithOptional
-import io.ktor.server.auth.principalOrNull
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.routing
-import io.ktor.server.util.getValue
-
-fun Application.routes() {
-  routing {
-    authenticateWithOptional(basicAuth) {
-      get("/greet/{name}/hello") {
-        val name: String by call.pathParameters
-        val user: UserIdPrincipal? = call.principalOrNull
-        call.respondText("Hello, ${user?.name ?: name}")
-      }
-    }
-  }
-}
-```
-
-<!--
-A page that greets a visitor by name when it knows them and generically
-otherwise. `authenticateWithOptional` lets a request without credentials
-through, and inside its block the nullable accessor is the only one that
-compiles: the decision the handler has to make is spelled out in the
-type. A request with wrong credentials is still refused, so optional
-never means "any password will do".
--->
-
----
-
-# Several schemes share a principal type
-
-<DrawnAnnotation text="authenticateWithAnyOf<UserIdPrincipal>(basicAuth, formAuth)" label="Tried in order; the first that succeeds provides the principal" :geometry="{ label: { x: 0.74, y: 0.42, width: 0.4 } }" />
-<DrawnAnnotation text="call.principal.name" label="The common type: a supertype when the schemes differ" :geometry="{ label: { x: 0.76, y: 0.54, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.authenticateWithAnyOf
-import io.ktor.server.auth.principal
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    authenticateWithAnyOf<UserIdPrincipal>(basicAuth, formAuth) {
-      get("/greet/{name}/hello") {
-        call.respondText("Hello, ${call.principal.name}")
-      }
-    }
-  }
-}
-```
-
-<!--
-The browser prompt and the login form guard the same page:
-`authenticateWithAnyOf` accepts either, and the type argument is what
-the handler gets, so the schemes have to agree on it, or on a common
-supertype, an `interface AppUser` implemented by both principals. Only
-`call.principal` is available in this block; what a single scheme adds,
-the session of the next part for instance, is not.
--->
-
----
-
-# Schemes differ in the transport
-
-| `basic<P>("…")`            | name and password in a header; only over TLS         |
-|----------------------------|-------------------------------------------------------|
-| `digest<P>("…")`           | the same prompt, the password hashed on the wire      |
-| `form<P>("…")`             | name and password in a `POST` body: a login page      |
-| `session<S, P>("…")`       | a cookie written at login: the next part              |
-| `jwt<P>("…")`              | a signed token in `Authorization: Bearer`             |
-| `bearer<P>("…")`           | an opaque token you look up yourself                  |
-| `apiKey<P>("…")`           | a key in a header: `ktor-server-auth-api-key`         |
-| `oauth2Session<P, S>("…")` | sign in with Google or GitHub: the last part          |
-
-<!--
-All of them live in `ktor-server-auth`, except `jwt` in
-`ktor-server-auth-jwt` and `apiKey` in `ktor-server-auth-api-key`.
-Digest is Basic's safer sibling: the client proves it knows the password
-without sending it. OAuth is the odd one out: it redirects the user to
-the provider, receives a code back, and exchanges it for a token; the
-typed flow installs those routes for you, and the OpenID Connect plug-in
-at the end of the lesson configures it from a single URL. Each scheme
-ends in a `validate` block, and each is scoped with the same
-`authenticateWith`. The named providers, `install(Authentication)` and
-`authenticate("name")`, are still there, and the two APIs nest in either
-order.
--->
-
----
-
-# A login has to outlive its request
-
-> HTTP forgets: the login's outcome must reach the next request
-
-| A session | the server remembers; a cookie or a header carries the identifier |
-|-----------|-------------------------------------------------------------------|
-| A token   | the client carries the signed proof; the server only verifies it  |
-
-<!--
-Basic sends the password every time, which is fine for a script and
-wrong for a website. After the login route has done its checks, something
-has to represent "logged in" on the next request. Two designs: keep the
-state on the server and hand out a reference, the sessions of lesson 4;
-or sign the state and hand it to the client, JSON Web Tokens, the usual
-choice between services and for mobile clients.
--->
-
----
-
-# A session scheme names what is stored
-
-<DrawnAnnotation text="session<UserInfo, UserInfo>(&quot;auth-session&quot;)" label="Lesson 4's session class, twice: what the cookie carries, what the handler gets" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
-<DrawnAnnotation text="validate { it }" label="The cookie exists and deserializes: the session object is the principal" :geometry="{ label: { x: 0.74, y: 0.6, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.auth.session
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class UserInfo(val name: String, val timezone: String)
-
-val sessionAuth = session<UserInfo, UserInfo>("auth-session") {
-  validate { it }
-}
-```
-
-<!--
-Same shape, another factory. `session` takes two types: the class stored
-for the caller, and the principal the routes work with. Here they are
-the same, and the simplest validation returns the session: having the
-cookie is the proof, because only the login route writes it. No
-`install(Sessions)` and no `cookie<UserInfo>` registration here: the
-scheme knows its own transport, in a moment.
--->
-
----
-magic-move
----
-
-# A session scheme names what is stored
-
-<DrawnAnnotation text="onUnauthorized = { call.respondRedirect(&quot;/login&quot;) }" label="No cookie, or `null`: a redirect instead of the default `401`" :geometry="{ label: { x: 0.74, y: 0.66, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.auth.session
-import io.ktor.server.response.respondRedirect
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class UserInfo(val name: String, val timezone: String)
-
-val sessionAuth = session<UserInfo, UserInfo>("auth-session") {
-  validate { it }
-  onUnauthorized = { call.respondRedirect("/login") }
-}
-```
-
-<!--
-A browser user should land on the login page, not on a status code.
-`onUnauthorized` is what the scheme does when validation fails; every
-scheme has one, with a sensible default, and a route can override it in
-its `authenticateWith` call. The `/login` route comes two slides on.
--->
-
----
-magic-move
----
-
-# Stored and used are two types
-
-<DrawnAnnotation text="session<UserInfo, UserIdPrincipal>" label="The cookie stays a `UserInfo`; the routes see a `UserIdPrincipal`" :geometry="{ label: { x: 0.74, y: 0.47, width: 0.4 } }" />
-<DrawnAnnotation text="if (info.name in users)" label="A real check: an account deleted since the login is caught here" :geometry="{ label: { x: 0.74, y: 0.6, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.session
-import io.ktor.server.response.respondRedirect
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class UserInfo(val name: String, val timezone: String)
-
-val sessionAuth = session<UserInfo, UserIdPrincipal>("auth-session") {
-  validate { info ->
-    if (info.name in users) UserIdPrincipal(info.name) else null
-  }
-  onUnauthorized = { call.respondRedirect("/login") }
-}
-```
-
-<!--
-`validate` has the same contract as for `basic`: it receives the session
-and returns the principal or `null`. This is where the two type arguments
-earn their place: the session is what the login stored, small and
-serializable; the principal is what the handlers want, loaded from the
-user table on every request, so a deleted account is refused on its next
-click. The handlers stay ignorant of the cookie's class, and the same
-`UserIdPrincipal` handler serves Basic and sessions alike.
--->
-
----
-magic-move
----
-
-# The transport belongs to the scheme
-
-<DrawnAnnotation text="SessionTransportType.CookieId(SessionStorageMemory())" label="Lesson 4's choice, made here: the data stays on the server, the cookie carries an id" :geometry="{ label: { x: 0.76, y: 0.42, width: 0.4 } }" />
-<DrawnAnnotation text="cookie.maxAgeInSeconds = 3600" label="The same cookie builder as `install(Sessions)`" :geometry="{ label: { x: 0.74, y: 0.52, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.server.auth.SessionTransportType
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.session
-import io.ktor.server.response.respondRedirect
-import io.ktor.server.sessions.SessionStorageMemory
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class UserInfo(val name: String, val timezone: String)
-
-val sessionAuth = session<UserInfo, UserIdPrincipal>("auth-session") {
-  transport = SessionTransportType.CookieId(SessionStorageMemory()) {
-    cookie.maxAgeInSeconds = 3600
-  }
-  validate { info ->
-    if (info.name in users) UserIdPrincipal(info.name) else null
-  }
-  onUnauthorized = { call.respondRedirect("/login") }
-}
-```
-
-<!--
-This is the default, spelled out: a cookie named after the scheme that
-carries a session id, the data in memory on the server. `HeaderId` is
-the same with a header, for programs; `Cookie` and `Header` send the
-value itself and need the encrypting transformer of lesson 4, because a
-session that says `admin` must not be editable by the client. Memory
-storage is for one process; `directorySessionStorage` or your own
-`SessionStorage` for production, lesson 4 again.
--->
-
----
-
-# The login route writes the session
-
-<DrawnAnnotation text="install(sessionAuth)" label="Installs `Sessions` for the scheme, with the transport it declared" :geometry="{ label: { x: 0.74, y: 0.36, width: 0.4 } }" />
-<DrawnAnnotation text="sessionAuth.setSession(UserInfo(name, tz))" label="After the checks pass: from now on the cookie says who" :geometry="{ label: { x: 0.76, y: 0.6, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.install
-import io.ktor.server.auth.setSession
-import io.ktor.server.routing.post
-import io.ktor.server.routing.routing
+import io.ktor.server.application.install
+import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.plugins.statuspages.statusFile
 
 fun Application.module() {
-  install(sessionAuth)
-  routing {
-    post("/login") {
-      if (loggedIn) sessionAuth.setSession(UserInfo(name, tz))
+  install(StatusPages) {
+    statusFile(
+      HttpStatusCode.Unauthorized,
+      HttpStatusCode.NotFound,
+      filePattern = "static/error/#.html",
+    )
+  }
+  routes()
+}
+```
+
+<!--
+The files live in `src/main/resources/static/error/`, the same place
+`staticResources` of lesson 5 serves from. A missing template answers
+`500`, so ship one per listed code. This is the uniform version of the
+previous slide: no Kotlin per page, a designer can own the HTML.
+-->
+
+---
+magic-move
+---
+
+# `StatusPages` rewrites the response
+
+<DrawnAnnotation text="exception<Throwable>" label="Any exception escaping a handler; the type parameter is the filter" :geometry="{ label: { x: 0.7231, y: 0.2637, width: 0.4000 } }" />
+<DrawnAnnotation text="HttpStatusCode.InternalServerError" />
+
+```kotlin
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.statuspages.StatusPages
+import kotlinx.html.body
+import kotlinx.html.h1
+import kotlinx.html.p
+
+fun Application.module() {
+  install(StatusPages) {
+    exception<Throwable> { call, cause ->
+      call.respondHtml(HttpStatusCode.InternalServerError) {
+        body {
+          h1 { +"This is embarrassing" }
+          cause.message?.let { p { +it } }
+        }
+      }
     }
   }
   routes()
@@ -646,614 +148,228 @@ fun Application.module() {
 ```
 
 <!--
-Two things the scheme cannot do alone. Installing it puts the `Sessions`
-plug-in in place with a `cookie<UserInfo>("auth-session")` provider, the
-registration lesson 4 wrote by hand; an existing `install(Sessions)`
-block calls `sessionAuth.applyTransport()` instead. And a login route
-writes the session: `setSession` works on any route, and it has to,
-because a route behind the scheme would refuse the caller who has no
-session yet. The `if` stands for the checks; wrapping this route in
-`authenticateWith(basicAuth)` and storing `call.principal.name` is the
-tidy version, and the exercise.
--->
-
----
-
-# The handler gets both
-
-<DrawnAnnotation text="authenticateWith(sessionAuth)" label="Same scope, another scheme" :geometry="{ label: { x: 0.74, y: 0.289, width: 0.36 } }" />
-<DrawnAnnotation text="call.principal" label="What `validate` returned: a `UserIdPrincipal`" :geometry="{ label: { x: 0.8, y: 0.383, width: 0.3 } }" />
-<DrawnAnnotation text="call.session.timezone" label="What the login stored, typed as well: only in a session scheme's block" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.authenticateWith
-import io.ktor.server.auth.principal
-import io.ktor.server.auth.session
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    authenticateWith(sessionAuth) {
-      get("/greet/{name}/hello") {
-        val user: UserIdPrincipal = call.principal
-        call.respondText("Hello, ${user.name} in ${call.session.timezone}")
-      }
-    }
-  }
-}
-```
-
-<!--
-The handler is the one from the Basic version, and `call.principal` is
-the same `UserIdPrincipal`. A session scheme adds a second typed
-property: `call.session` is the stored `UserInfo`, readable and
-assignable, so a `POST /switch-timezone` writes `call.session =
-call.session.copy(timezone = …)` and `updateSession { }` does it in one
-step. No `call.sessions.get<UserInfo>()`: `validate` already read the
-cookie.
+Without this, an exception is logged and the client gets an empty
+`500`. With it, the handler's failure becomes a response you designed.
+The most specific registered type wins when several match, so a
+`Throwable` handler is the safety net under narrower ones.
 -->
 
 ---
 magic-move
 ---
 
-# Signing out clears the session
+# The message is not for the client
 
-<DrawnAnnotation text="sessionAuth.clearSession()" label="Removes the stored session: the next request is anonymous again" :geometry="{ label: { x: 0.74, y: 0.62, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.authenticateWith
-import io.ktor.server.auth.clearSession
-import io.ktor.server.auth.principal
-import io.ktor.server.auth.session
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.post
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    authenticateWith(sessionAuth) {
-      get("/greet/{name}/hello") {
-        val user: UserIdPrincipal = call.principal
-        call.respondText("Hello, ${user.name} in ${call.session.timezone}")
-      }
-      post("/logout") {
-        sessionAuth.clearSession()
-        call.respondText("Bye")
-      }
-    }
-  }
-}
-```
-
-<!--
-The counterpart of `setSession`. Inside the protected block
-`call.clearSession()` does the same; on the scheme it works anywhere.
-Cookies travel on every request, including one another site triggers,
-so a scheme that stays in a browser adds `csrfProtection { }` to its
-configuration, the CSRF plug-in scoped to these routes.
--->
-
----
-
-# A token carries its own claims
-
-> `header.payload.signature`: readable by all, forged by none
-
-<DrawnAnnotation text="&quot;username&quot;" label="A claim: something the issuer asserts about the holder" :geometry="{ label: { x: 0.7, y: 0.352, width: 0.4 } }" />
-<DrawnAnnotation text="&quot;exp&quot;" label="A registered claim: expiry in seconds since the epoch, checked by the verifier" :geometry="{ label: { x: 0.72, y: 0.5, width: 0.44 } }" />
-
-```json
-{
-  "username": "alex",
-  "exp": 1767225600
-}
-```
-
-<!--
-A JSON Web Token is three base64 parts joined with dots: a header naming
-the algorithm, a payload, and a signature over the first two. The payload
-is a JSON object of claims, statements the issuer makes: registered ones
-such as `exp`, `iss`, `aud`, `sub`, and your own, `username` here. The
-payload is not encrypted, only signed: do not put a password in it.
-Tokens are the usual choice between services, because any service with
-the key can verify one without a shared session store.
--->
-
----
-
-# The login signs the token
-
-<DrawnAnnotation text="JWT.create()" label="`com.auth0:java-jwt`: a builder for the payload" :geometry="{ label: { x: 0.74, y: 0.383, width: 0.36 } }" />
-<DrawnAnnotation text=".sign(" label="HS256: one shared secret both signs and verifies" :geometry="{ label: { x: 0.74, y: 0.48, width: 0.36 } }" />
-<DrawnAnnotation text="secret" label="Hard-coded: from configuration, lesson 9" color="red" :geometry="{ label: { x: 0.74, y: 0.58, width: 0.32 } }" />
+<DrawnAnnotation text="cause.message?.let { p { +it } }" label="Exfiltration: a table name, a file path, a connection string, sent to whoever asked" color="red" :geometry="{ label: { x: 0.72, y: 0.6, width: 0.44 } }" />
 
 ```kotlin
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
-import io.ktor.server.application.Application
-import io.ktor.server.routing.post
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    post("/login") {
-      if (loggedIn) {
-        val token = JWT.create()
-          .sign(Algorithm.HMAC256(secret))
-      }
-    }
-  }
-}
-```
-
-<!--
-The same login route, issuing a token instead of writing a session. Ktor
-does not build tokens; `java-jwt` from Auth0 does, and
-`ktor-server-auth-jwt` depends on it. `Algorithm.HMAC256` is symmetric:
-whoever can verify can also sign, fine within one application, while
-RS256 with a key pair lets other services verify without being able to
-issue. A secret in the source is in every git clone and every build.
--->
-
----
-magic-move
----
-
-# The login signs the token
-
-<DrawnAnnotation text=".withClaim(&quot;username&quot;, name)" label="The claim: what the checks established, nothing more" :geometry="{ label: { x: 0.74, y: 0.43, width: 0.4 } }" />
-
-```kotlin
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
-import io.ktor.server.application.Application
-import io.ktor.server.routing.post
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    post("/login") {
-      if (loggedIn) {
-        val token = JWT.create()
-          .withClaim("username", name)
-          .sign(Algorithm.HMAC256(secret))
-      }
-    }
-  }
-}
-```
-
-<!--
-Claims are the payload; `withClaim` takes strings, numbers, booleans,
-dates, lists. `withIssuer` and `withAudience` are the registered ones the
-verifier can insist on, so a token minted for one service is refused by
-another.
--->
-
----
-magic-move
----
-
-# The login signs the token
-
-<DrawnAnnotation text=".withExpiresAt(Date(System.currentTimeMillis() + 60_000))" label="`exp`: one minute; the verifier refuses the token afterwards" :geometry="{ label: { x: 0.76, y: 0.58, width: 0.36 } }" />
-
-```kotlin
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
-import io.ktor.server.application.Application
-import io.ktor.server.routing.post
-import io.ktor.server.routing.routing
-import java.util.Date
-
-fun Application.routes() {
-  routing {
-    post("/login") {
-      if (loggedIn) {
-        val token = JWT.create()
-          .withClaim("username", name)
-          .withExpiresAt(Date(System.currentTimeMillis() + 60_000))
-          .sign(Algorithm.HMAC256(secret))
-      }
-    }
-  }
-}
-```
-
-<!--
-A token cannot be revoked, there is no server-side state to delete, so it
-has to expire. Short lifetimes plus a refresh token is the usual pattern;
-a minute is for the demo. `java-jwt` still speaks `java.util.Date`;
-`Instant` converts with `Date.from`.
--->
-
----
-magic-move
----
-
-# The login signs the token
-
-<DrawnAnnotation text="call.respond(mapOf(&quot;token&quot; to token))" label="A JSON body with the token: the client keeps it, and sends it back" :geometry="{ label: { x: 0.76, y: 0.571, width: 0.36 } }" />
-
-```kotlin
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
-import io.ktor.server.application.Application
-import io.ktor.server.response.respond
-import io.ktor.server.routing.post
-import io.ktor.server.routing.routing
-import java.util.Date
-
-fun Application.routes() {
-  routing {
-    post("/login") {
-      if (loggedIn) {
-        val token = JWT.create()
-          .withClaim("username", name)
-          .withExpiresAt(Date(System.currentTimeMillis() + 60_000))
-          .sign(Algorithm.HMAC256(secret))
-        call.respond(mapOf("token" to token))
-      }
-    }
-  }
-}
-```
-
-<!--
-`ContentNegotiation` from lesson 2 turns the map into `{"token": "eyJ…"}`.
-Where the client keeps it is its problem: memory for a program, secure
-storage on a phone. The token is a bearer credential, whoever holds it is
-the user, so it deserves the same care as a password.
--->
-
----
-
-# The token travels as a bearer header
-
-> Not a cookie: the client adds the header itself, every time
-
-<DrawnAnnotation text="eyJhbGciOiJIUzI1NiJ9" label="Header: the algorithm" :geometry="{ label: { x: 0.24, y: 0.5, width: 0.26 } }" />
-<DrawnAnnotation text="eyJ1c2VybmFtZSI6ImFsZXgifQ" label="Payload: the claims, base64" :geometry="{ label: { x: 0.53, y: 0.5, width: 0.26 } }" />
-<DrawnAnnotation text="9idj00e3…" label="Signature: the HMAC over both" :geometry="{ label: { x: 0.81, y: 0.5, width: 0.26 } }" />
-
-```http
-GET /greet/alex/hello/9 HTTP/1.1
-Host: localhost:8080
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJ1c2VybmFtZSI6ImFsZXgifQ.9idj00e3…
-```
-
-<!--
-Same `Authorization` header as Basic, another scheme: `Bearer` means
-"whoever bears this". No browser prompt and no cookie jar, the client
-code sets the header, `bearerAuth(token)` in the Ktor client, lesson 7.
-Decode the middle part and the claims are right there, which is the
-point: the server reads them without a lookup, and the signature is what
-makes them trustworthy.
--->
-
----
-
-# Verify the signature, then the claims
-
-<DrawnAnnotation text="jwt<UserIdPrincipal>(&quot;auth-jwt&quot;)" label="`ktor-server-auth-jwt`: reads `Authorization: Bearer`" :geometry="{ label: { x: 0.74, y: 0.36, width: 0.4 } }" />
-<DrawnAnnotation text="verifier(" label="Signature and `exp`, with the same secret: a forged or stale token stops here" :geometry="{ label: { x: 0.72, y: 0.58, width: 0.44 } }" />
-
-```kotlin
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.jwt.jwt
-
-val jwtAuth = jwt<UserIdPrincipal>("auth-jwt") {
-  realm = "Access to secrets"
-  verifier(JWT.require(Algorithm.HMAC256(secret)).build())
-}
-```
-
-<!--
-The scheme does two things in order. The verifier is `java-jwt` again:
-`require` names the algorithm and secret, `withIssuer` and `withAudience`
-add the registered claims to insist on, `build` gives a `JWTVerifier`.
-A token whose signature does not match, or whose `exp` has passed, never
-reaches `validate`. For RS256, `verifier(jwkProvider, issuer)` fetches
-the public keys from the issuer; the OpenID Connect plug-in at the end
-does that for you.
--->
-
----
-magic-move
----
-
-# Verify the signature, then the claims
-
-<DrawnAnnotation text="getClaim(&quot;username&quot;)" label="Your rules on the verified claims" :geometry="{ label: { x: 0.74, y: 0.54, width: 0.36 } }" />
-<DrawnAnnotation text="UserIdPrincipal(user)" label="The claim becomes the principal: the handler never sees the token" :geometry="{ label: { x: 0.74, y: 0.64, width: 0.4 } }" />
-
-```kotlin
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.jwt.jwt
-
-val jwtAuth = jwt<UserIdPrincipal>("auth-jwt") {
-  realm = "Access to secrets"
-  verifier(JWT.require(Algorithm.HMAC256(secret)).build())
-  validate { credential ->
-    val user = credential.payload.getClaim("username").asString()
-    if (user.isNullOrEmpty()) null else UserIdPrincipal(user)
-  }
-}
-```
-
-<!--
-`validate` is mandatory for `jwt`: the credential holds the verified
-payload, and the block decides whether these claims are enough, and what
-the routes get. A missing `username` claim reads as `null`. Returning
-`JWTPrincipal(credential.payload)` with `jwt<JWTPrincipal>` keeps the
-whole payload for handlers that need more claims; a `UserIdPrincipal`
-keeps them identical to the Basic and session versions.
--->
-
----
-magic-move
----
-
-# Verify the signature, then the claims
-
-<DrawnAnnotation text="onUnauthorized = { cause ->" label="Without it a bare `401` with `WWW-Authenticate: Bearer`; the cause says why" :geometry="{ label: { x: 0.74, y: 0.64, width: 0.4 } }" />
-
-```kotlin
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.jwt.jwt
-import io.ktor.server.response.respond
-
-val jwtAuth = jwt<UserIdPrincipal>("auth-jwt") {
-  realm = "Access to secrets"
-  verifier(JWT.require(Algorithm.HMAC256(secret)).build())
-  validate { credential ->
-    val user = credential.payload.getClaim("username").asString()
-    if (user.isNullOrEmpty()) null else UserIdPrincipal(user)
-  }
-  onUnauthorized = { cause ->
-    call.respond(HttpStatusCode.Unauthorized, "Token invalid or expired")
-  }
-}
-```
-
-<!--
-A program on the other end wants a status and a reason, not a redirect.
-The default answers `401` with `WWW-Authenticate: Bearer`; this one adds
-a body. The `cause` is an `AuthenticationFailedCause`: no credentials,
-invalid credentials, or an error with a message. `StatusPages` from
-lesson 7 could render the `401` instead, for a uniform error format.
--->
-
----
-
-# The handler never parses the token
-
-<DrawnAnnotation text="authenticateWith(jwtAuth)" label="The third scheme in the same block" :geometry="{ label: { x: 0.74, y: 0.32, width: 0.36 } }" />
-<DrawnAnnotation text="call.principal.name" label="The claim the login wrote, shaped by `validate`; the signature vouches for it" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.authenticateWith
-import io.ktor.server.auth.principal
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    authenticateWith(jwtAuth) {
-      get("/greet/{name}/hello") {
-        call.respondText("Hello, ${call.principal.name}")
-      }
-    }
-  }
-}
-```
-
-<!--
-Three schemes, one handler: swap `basicAuth` for `sessionAuth` or
-`jwtAuth` and the body does not change, because all three promised a
-`UserIdPrincipal`. Nothing here touched a database or a session store:
-the token was the proof, and `validate` turned its claim into the
-principal once, so no handler repeats the parsing.
--->
-
----
-
-# Roles are resolved after authentication
-
-> Authorization says what: opt in with `withRoles`
-
-<DrawnAnnotation text="enum class Role : AuthenticationRole" label="Any type with a `name`; an enum is the usual one" :geometry="{ label: { x: 0.74, y: 0.42, width: 0.4 } }" />
-<DrawnAnnotation text="jwtAuth.withRoles { user ->" label="Runs on every request, after `validate`: a database, a cache, or the principal itself" :geometry="{ label: { x: 0.74, y: 0.56, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.auth.AuthenticationRole
-import io.ktor.server.auth.withRoles
-
-enum class Role : AuthenticationRole { User, Admin }
-
-val roleAuth = jwtAuth.withRoles { user ->
-  if (user.name == "Alex") setOf(Role.User, Role.Admin) else setOf(Role.User)
-}
-```
-
-<!--
-Authentication established who; roles say what they may do, and the
-typed API keeps them separate on purpose. `withRoles` wraps an existing
-scheme, any of the three, in a role-aware one, and the block resolves
-the caller's roles from the principal: a lookup in the user table,
-a claim in the token, or a rule as here. A route without a role
-requirement never runs it.
--->
-
----
-magic-move
----
-
-# A missing role is `403`, not `401`
-
-<DrawnAnnotation text="roles = setOf(Role.Admin)" label="Every role in the set is required; authenticated without it: `403 Forbidden`" :geometry="{ label: { x: 0.74, y: 0.36, width: 0.4 } }" />
-<DrawnAnnotation text="call.principal.roles" label="What the block resolved; only inside a role-aware route" :geometry="{ label: { x: 0.76, y: 0.5, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.authenticateWith
-import io.ktor.server.auth.principal
-import io.ktor.server.auth.roles
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    authenticateWith(roleAuth, roles = setOf(Role.Admin)) {
-      get("/greet/{name}/hello") {
-        val roles: Set<Role> = call.principal.roles
-        call.respondText("Hello, ${call.principal.name}: $roles")
-      }
-    }
-  }
-}
-```
-
-<!--
-Two failures, two statuses: `401` when the caller could not be
-identified, `403` when they were identified and are not allowed, and
-`onForbidden` on the scheme or the route customises the second like
-`onUnauthorized` does the first. `roles = null` resolves the roles
-without requiring any, for a handler that shows an admin view to some
-and a user view to the rest. A plain `authenticateWith(jwtAuth)` block
-has no `roles` property at all: it does not compile.
--->
-
----
-
-# Too many logins is a `429`
-
-> The login route is where passwords get guessed
-
-<DrawnAnnotation text="install(RateLimit)" label="`ktor-server-rate-limit`: a token bucket per key, the caller's address by default" :geometry="{ label: { x: 0.76, y: 0.352, width: 0.44 } }" />
-<DrawnAnnotation text="rateLimiter(limit = 5, refillPeriod = 1.minutes)" label="Five attempts a minute; the sixth is `429 Too Many Requests` with `Retry-After`" :geometry="{ label: { x: 0.575, y: 0.52, width: 0.75 } }" />
-<DrawnAnnotation text="rateLimit(RateLimitName(&quot;login&quot;))" label="A route node like `authenticateWith`: only the routes inside count" :geometry="{ label: { x: 0.73, y: 0.634, width: 0.46 } }" />
-
-```kotlin
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import io.ktor.server.plugins.ratelimit.RateLimit
-import io.ktor.server.plugins.ratelimit.RateLimitName
-import io.ktor.server.plugins.ratelimit.rateLimit
-import io.ktor.server.routing.post
-import io.ktor.server.routing.routing
-import kotlin.time.Duration.Companion.minutes
+import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.statuspages.StatusPages
+import kotlinx.html.body
+import kotlinx.html.h1
+import kotlinx.html.p
 
 fun Application.module() {
-  install(RateLimit) {
-    register(RateLimitName("login")) {
-      rateLimiter(limit = 5, refillPeriod = 1.minutes)
+  install(StatusPages) {
+    exception<Throwable> { call, cause ->
+      call.respondHtml(HttpStatusCode.InternalServerError) {
+        body {
+          h1 { +"This is embarrassing" }
+          cause.message?.let { p { +it } }
+        }
+      }
     }
   }
-  routing {
-    rateLimit(RateLimitName("login")) {
-      post("/login") { issueToken() }
+  routes()
+}
+```
+
+---
+magic-move
+---
+
+# The message is not for the client
+
+<DrawnAnnotation text="logger.log(&quot;db: ${cause.message}&quot;)" label="The detail goes to the log, the client gets the page"  :geometry="{ label: { x: 0.5167, y: 0.5892 } }"/>
+
+```kotlin
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.statuspages.StatusPages
+import kotlinx.html.body
+import kotlinx.html.h1
+import kotlinx.html.p
+
+fun Application.module(logger: Logger) {
+  install(StatusPages) {
+    exception<Throwable> { call, cause ->
+      logger.log("db: ${cause.message}")
+      call.respondHtml(HttpStatusCode.InternalServerError) {
+        body {
+          h1 { +"This is embarrassing" }
+        }
+      }
     }
   }
+  routes()
+}
+```
+
+---
+magic-move
+---
+
+# Narrow the exception, log the detail
+
+<DrawnAnnotation text="exception<DatabaseException>" label="Only this type and its subclasses; anything else falls through to the default `500`" on="0" :geometry="{ label: { x: 0.6816, y: 0.5645, width: 0.3200 } }" />
+
+```kotlin
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.statuspages.StatusPages
+import kotlinx.html.body
+import kotlinx.html.h1
+
+fun Application.module(logger: Logger) {
+  install(StatusPages) {
+    exception<DatabaseException> { call, cause ->
+      logger.log("db: ${cause.message}")
+      call.respondHtml(HttpStatusCode.InternalServerError) {
+        body { h1 { +"This is embarrassing" } }
+      }
+    }
+  }
+  routes()
 }
 ```
 
 <!--
-Authorization has a third answer next to `401` and `403`: not now. The
-plug-in keeps a bucket of tokens per key, takes one per request, and
-refills the bucket over the period; an empty bucket is a `429` with
-`Retry-After` and `X-RateLimit-Remaining` on every response before it.
-`requestKey { call -> … }` chooses the key, a user name instead of an
-address for the routes behind a scheme, Ktor 3.6 lets it read
-`call.principal`; `requestWeight` charges some calls more.
-`register { }` without a name is the global limit, `rateLimit { }`
-without one applies it. Lesson 5's client retry honours `Retry-After`,
-so the two halves agree.
+`exception<T>` is generic in the exception type, so one handler per
+failure family: a `DatabaseException` becomes a `503` with a retry hint, a
+`ValidationException` a `400` with the field names, and the `Throwable`
+handler stays as the net. The `Logger` here is the deck's tiny interface;
+in a real module it is `log`, the SLF4J logger every `Application` has.
+Context parameters are Kotlin 2.2+, `-Xcontext-parameters`; a plain
+`Application.module(logger: Logger)` says the same with more typing.
 -->
 
 ---
 
-# One issuer URL configures the provider
+# Validation is a plug-in
 
-> OpenID Connect: OAuth 2.0 plus an ID token, discovered from `/.well-known/openid-configuration`
+> Lesson 3 answered `400` for a blank name by hand
 
-<DrawnAnnotation text="suspend fun Application.module()" label="Discovery is an HTTP request: the module suspends until the provider answers" :geometry="{ label: { x: 0.72, y: 0.36, width: 0.44 } }" />
-<DrawnAnnotation text="install(Oidc)" label="`ktor-server-auth-oidc`: experimental in 3.6.0, JVM only" :geometry="{ label: { x: 0.74, y: 0.47, width: 0.4 } }" />
-<DrawnAnnotation text="issuer = " label="Endpoints, signing keys and algorithms come from the discovery document, refreshed every 15 minutes" :geometry="{ label: { x: 0.72, y: 0.62, width: 0.44 } }" />
+<DrawnAnnotation text="install(RequestValidation)" label="`ktor-server-request-validation`: runs after `ContentNegotiation` built the object" :geometry="{ label: { x: 0.6185, y: 0.3294, width: 0.5000 } }" />
+<DrawnAnnotation text="validate<Greeting>" />
+<DrawnAnnotation text="ValidationResult.Invalid(" />
+<DrawnAnnotation text="ValidationResult.Valid" label="One rule per body type: the handler only ever sees a valid one" :geometry="{ label: { x: 0.5639, y: 0.5335, width: 0.5000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import io.ktor.server.auth.oidc.Oidc
+import io.ktor.server.plugins.requestvalidation.RequestValidation
+import io.ktor.server.plugins.requestvalidation.ValidationResult
 
-suspend fun Application.module() {
-  val oidc = install(Oidc)
-  val google = oidc.identityProvider("google") {
-    issuer = "https://accounts.google.com"
+fun Application.module() {
+  install(RequestValidation) {
+    validate<Greeting> { greeting ->
+      if (greeting.name.isBlank()) ValidationResult.Invalid("name is blank")
+      else ValidationResult.Valid
+    }
   }
+  routes()
 }
 ```
 
 <!--
-Sign in with Google, GitHub, Keycloak, Auth0: an identity provider
-authenticates the user and hands your application a signed ID token
-saying who they are, OAuth 2.0 with an identity layer on top. Doing that
-by hand is a `HttpClient`, an authorization URL, a token URL, a JWKS
-endpoint and a verifier; the `Oidc` plug-in derives all of it from the
-issuer URL. The module is `suspend` because `identityProvider` fetches
-the discovery document before it returns; a missing or mismatched issuer
-fails the start-up rather than the first request, and key rotation
-reaches the application without a restart.
+`Greeting` is lesson 3's DTO. The rule is stated once, next to the
+plug-ins, and every `call.receive<Greeting>()` in the application runs
+it: a handler that gets a `Greeting` gets a valid one. The block
+suspends, so a lookup is welcome; `validate { filter { }; validation { } }`
+matches on anything other than the type. What happens with an invalid
+body is the next slide.
 -->
 
 ---
 magic-move
 ---
 
-# An API validates the tokens it is handed
+# A failed validation is a `400`
 
-<DrawnAnnotation text="bearer { audience = setOf(&quot;greetings-api&quot;) }" label="Who the token was minted for: your API's identifier, never the login's client id" :geometry="{ label: { x: 0.74, y: 0.36, width: 0.4 } }" />
-<DrawnAnnotation text="google.jwtBearer" label="A typed scheme: signature against the provider's keys, issuer, audience, expiry" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
-<DrawnAnnotation text="call.principal.claims.subject" label="`OidcToken.Access`: the verified claims, and `userInfo` when the token carries it" :geometry="{ label: { x: 0.74, y: 0.62, width: 0.4 } }" />
+<DrawnAnnotation text="install(StatusPages)" label="An exception like any other: `StatusPages` gives it its status" :geometry="{ label: { x: 0.6241, y: 0.5253, width: 0.6300 } }" />
+<DrawnAnnotation text="exception<RequestValidationException>" />
+<DrawnAnnotation text="cause.reasons" label="Every `Invalid` reason, collected" :geometry="{ label: { x: 0.7236, y: 0.6879, width: 0.5000 } }" />
+
+```kotlin
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.requestvalidation.RequestValidation
+import io.ktor.server.plugins.requestvalidation.RequestValidationException
+import io.ktor.server.plugins.requestvalidation.ValidationResult
+import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.response.respond
+
+fun Application.module() {
+  install(RequestValidation) {
+    validate<Greeting> { greeting ->
+      if (greeting.name.isBlank()) ValidationResult.Invalid("name is blank")
+      else ValidationResult.Valid
+    }
+  }
+  install(StatusPages) {
+    exception<RequestValidationException> { call, cause ->
+      call.respond(HttpStatusCode.BadRequest, cause.reasons.joinToString())
+    }
+  }
+  routes()
+}
+```
+
+<!--
+The plug-in throws; it does not answer. That is on purpose: the shape of
+the error response is yours, and `StatusPages` from the start of this
+lesson is where it is decided, once, for every route. A JSON API
+responds with a `@Serializable` error object here instead of a string.
+Without the handler the exception is an ordinary `500`.
+-->
+
+---
+
+# A plug-in can be scoped to a route
+
+<DrawnAnnotation text="route(&quot;/greet&quot;)" label="Only this subtree validates: `route { }` has its own `install`" :geometry="{ label: { x: 0.65, y: 0.289, width: 0.62 } }" />
+<DrawnAnnotation text="install(RequestValidation)" label="`CallId`, `CORS`, `RateLimit`, `Authentication` install the same way" :geometry="{ label: { x: 0.75, y: 0.36, width: 0.46 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import io.ktor.server.auth.authenticateWith
-import io.ktor.server.auth.oidc.Oidc
-import io.ktor.server.auth.principal
-import io.ktor.server.routing.get
+import io.ktor.server.plugins.requestvalidation.RequestValidation
+import io.ktor.server.plugins.requestvalidation.ValidationResult
+import io.ktor.server.request.receive
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.post
+import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 
-suspend fun Application.module() {
-  val oidc = install(Oidc)
-  val google = oidc.identityProvider("google") {
-    issuer = "https://accounts.google.com"
-    bearer { audience = setOf("greetings-api") }
-  }
+fun Application.module() {
   routing {
-    authenticateWith(google.jwtBearer) {
-      get("/greet/{name}/hello") {
-        call.respondText("Hello, ${call.principal.claims.subject}")
+    route("/greet") {
+      install(RequestValidation) {
+        validate<Greeting> { greeting ->
+          if (greeting.name.isBlank()) ValidationResult.Invalid("name is blank")
+          else ValidationResult.Valid
+        }
+      }
+      post {
+        call.respondText("Hello, ${call.receive<Greeting>().name}")
       }
     }
   }
@@ -1261,173 +377,669 @@ suspend fun Application.module() {
 ```
 
 <!--
-A resource server: an API that accepts tokens somebody else issued, no
-login page, no session. `bearer` names the audience the API expects,
-and `jwtBearer` is the `jwt` scheme of the previous part configured for
-you: `Authorization: Bearer`, the provider's public keys, issuer,
-audience, `exp`. A token whose audience is your OAuth client id would
-let an ID token pass as an access token, hence the separate identifier.
-Providers that issue opaque tokens instead get `introspection { }` and
-`introspectionBearer`, a call to the provider per request.
+Most plug-ins are `RouteScopedPlugin`s: installed on the application
+they apply everywhere, installed inside a `route { }` only below it. An
+admin subtree with stricter validation, a public one with `CORS`, a
+login route with a rate limit, lesson 9: the pipeline is per route as
+much as per application. `createRouteScopedPlugin` is the
+`createApplicationPlugin` of the next slide for your own.
 -->
 
 ---
 
-# A browser signs in at the provider
+# A plug-in hooks into the pipeline
 
-<DrawnAnnotation text="oauth {" label="The authorization code flow, PKCE and `state` included" :geometry="{ label: { x: 0.74, y: 0.42, width: 0.4 } }" />
-<DrawnAnnotation text="System.getenv(&quot;GOOGLE_CLIENT_ID&quot;)" label="Registered with the provider; lesson 9 has the configuration file" :geometry="{ label: { x: 0.76, y: 0.52, width: 0.36 } }" />
-<DrawnAnnotation text="onAuthenticated { idToken ->" label="Runs once, after the callback validated the ID token and stored the session" :geometry="{ label: { x: 0.74, y: 0.64, width: 0.4 } }" />
+> When `StatusPages` is not enough, write your own
+
+<DrawnAnnotation text="createApplicationPlugin(&quot;MyPlugin&quot;)" on="0" label="`io.ktor.server.application`: a value, installed like any plug-in" :geometry="{ label: { x: 0.6917, y: 0.4129, width: 0.2800 } }" />
+<DrawnAnnotation text="onCallRespond" on="1" label="Before the body is parsed, and after `respond`: where most plug-ins live" :geometry="{ label: { x: 0.7111, y: 0.3935, width: 0.4000 } }" />
+<DrawnAnnotation text="on(CallFailed)" on="2" label="Other hooks: `CallFailed`, `CallSetup`, `ResponseSent`, `MonitoringEvent(…)`" :geometry="{ label: { x: 0.7166, y: 0.4560, width: 0.4400 } }" />
 
 ```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.auth.oidc.Oidc
-import io.ktor.server.response.respondRedirect
+import io.ktor.server.application.createApplicationPlugin
+import io.ktor.server.application.hooks.CallFailed
 
-suspend fun Application.module() {
-  val oidc = install(Oidc)
-  val google = oidc.identityProvider("google") {
-    issuer = "https://accounts.google.com"
-    oauth {
-      clientId = System.getenv("GOOGLE_CLIENT_ID")
-      clientSecret = System.getenv("GOOGLE_CLIENT_SECRET")
-      onAuthenticated { idToken ->
-        call.respondRedirect("/greet/${idToken.userInfo.name}/hello/9")
-      }
-    }
-  }
+val MyPlugin = createApplicationPlugin("MyPlugin") {
+  onCallReceive { call -> TODO() }
+  onCallRespond { call -> TODO() }
+  on(CallFailed) { call, cause -> TODO() }
 }
 ```
-
-<!--
-The other scenario: the user is a person in a browser. `oauth` turns the
-provider into a login: the user is redirected to Google with a `state`,
-a `nonce` and a PKCE challenge, signs in there, and comes back with a
-code the plug-in exchanges for tokens, validating the ID token against
-the discovery document. The client id and secret are what you registered
-at the provider, together with the callback URL. `onAuthenticated` is
-where a real application records the login and decides where the user
-lands; without it the callback answers an empty `200`.
--->
-
 ---
 
-# The plug-in owns the login routes
+# A test runs server and client in one process
 
-| `GET /oidc/google/login`     | redirects to the provider with `state`, `nonce` and the PKCE challenge     |
-|------------------------------|----------------------------------------------------------------------------|
-| `GET /oidc/google/callback`  | exchanges the code, validates the ID token, stores the session             |
-| `POST /oidc/google/logout`   | with `logout()`: clears the session, ends it at the provider               |
-| `POST /oidc/google/refresh`  | with `refresh()`: renews the tokens before they expire                     |
-
-<!--
-Nothing to write for these: the plug-in registers them under the
-provider's name, and `loginUri`, `redirectUri` and the `path` arguments
-of `logout()` and `refresh()` move them. The callback is the one to
-register with the provider as an allowed redirect URI. The session
-behind them is a `CookieId` in memory by default, `HttpOnly`,
-`SameSite=Lax`, `Secure` outside development, CSRF-protected; the
-`sessions { }` block swaps the storage for a persistent one and turns on
-`tokenRefreshStrategy` for sessions that outlive their ID token.
--->
-
----
-
-# The provider's session is a scheme
-
-<DrawnAnnotation text="google.session" label="A `session<OidcToken.Id, OidcToken.Id>` the callback wrote; `401` without it" :geometry="{ label: { x: 0.74, y: 0.36, width: 0.4 } }" />
-<DrawnAnnotation text="call.principal.userInfo.name" label="The ID token's claims, normalised: `subject`, `name`, `email`, `picture`" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
+<DrawnAnnotation text="testApplication" on="0" label="`ktor-server-test-host`: starts the application inside the test, no port, no network" :geometry="{ label: { x: 0.7, y: 0.29, width: 0.44 } }" />
+<DrawnAnnotation text="application { module() }" on="1" label="The module `embeddedServer` runs, unchanged" :geometry="{ label: { x: 0.76, y: 0.4, width: 0.36 } }" />
+<DrawnAnnotation text="client.get(" on="2" label="A ready-made client, wired to the test engine" :geometry="{ label: { x: 0.4878, y: 0.5065, width: 0.3600 } }" />
+<DrawnAnnotation text="shouldBe" on="2" />
 
 ```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.authenticateWith
-import io.ktor.server.auth.principal
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.routing
+import io.kotest.matchers.shouldBe
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.testing.testApplication
+import org.junit.jupiter.api.Test
 
-fun Application.routes() {
-  routing {
-    authenticateWith(google.session) {
-      get("/greet/{name}/hello") {
-        call.respondText("Hello, ${call.principal.userInfo.name}")
-      }
-    }
+class GreetingTest {
+  @Test
+  fun bye() = testApplication {
+    application { module() }
+    val response = client.get("/greet/alex/bye")
+    response.status shouldBe HttpStatusCode.OK
   }
 }
 ```
 
 <!--
-The session part of the lesson again, configured by the plug-in: the
-callback stored an `OidcToken.Id` under a fresh session id, and
-`google.session` is the session scheme that reads it back; `google` is
-the provider the module registered. The principal is the ID token:
-`userInfo` has the standard claims, `claims` the raw payload,
-`accessToken` and `refreshToken` what the provider handed over.
-Protected routes answer `401`, they do not redirect; link to the login
-route from your page or set `onUnauthorized` on the route.
+Testing a web server means starting it, sending requests with a client,
+checking the answers. Ktor controls both ends, so `testApplication` runs
+the application on a test engine and hands out a client that calls it
+directly: fast, isolated, no free port needed. `application { }` is the
+module, `createClient { }` builds more clients. Kotest's `shouldBe` is a
+matcher; the runner is JUnit 5, `@Test` from `org.junit.jupiter.api`.
+Mind the imports: there is a `get` for routes and a `get` for the
+client; the IDE offers both.
+-->
+
+---
+
+# A helper owns the set-up
+
+<DrawnAnnotation text="createClient {" label="A client with plug-ins: JSON bodies, as in lesson 6" :geometry="{ label: { x: 0.72, y: 0.29, width: 0.44 } }" />
+<DrawnAnnotation text="test(client)" label="The test receives the client and nothing else" :geometry="{ label: { x: 0.76, y: 0.48, width: 0.36 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.testing.testApplication
+
+fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
+  application { module() }
+  val client = createClient {
+    install(ContentNegotiation) { json() }
+  }
+  test(client)
+}
+```
+
+<!--
+Every test starts the same application and wants the same client; the
+plug-ins are the client-side ones, `io.ktor.client.plugins`, the same
+artifacts as lesson 6. One function, and every test is its body.
 -->
 
 ---
 magic-move
 ---
 
-# `mapPrincipal` makes it your user again
+# A helper owns the set-up
 
-<DrawnAnnotation text="google.session.mapPrincipal { token ->" label="A new scheme with another principal type; `null` refuses the caller" :geometry="{ label: { x: 0.74, y: 0.3, width: 0.4 } }" />
-<DrawnAnnotation text="call.principal.name" label="The handler from the Basic slide, unchanged" :geometry="{ label: { x: 0.76, y: 0.56, width: 0.36 } }" />
+<DrawnAnnotation text="expectSuccess = true" label="Any `4xx` or `5xx` throws: the test fails without an assertion" :geometry="{ label: { x: 0.74, y: 0.43, width: 0.4 } }" />
 
 ```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.auth.UserIdPrincipal
-import io.ktor.server.auth.authenticateWith
-import io.ktor.server.auth.mapPrincipal
-import io.ktor.server.auth.principal
-import io.ktor.server.routing.get
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.routing
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.testing.testApplication
 
-val googleAuth = google.session.mapPrincipal { token ->
-  UserIdPrincipal(token.userInfo.name ?: token.userInfo.subject)
-}
-
-fun Application.routes() {
-  routing {
-    authenticateWith(googleAuth) {
-      get("/greet/{name}/hello") {
-        call.respondText("Hello, ${call.principal.name}")
-      }
-    }
+fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
+  application { module() }
+  val client = createClient {
+    install(ContentNegotiation) { json() }
+    expectSuccess = true
   }
+  test(client)
 }
 ```
 
 <!--
-`mapPrincipal` works on any scheme: it runs after the scheme produced its
-principal and turns it into yours, here the same `UserIdPrincipal` the
-rest of the lesson used, in practice the user record loaded from your
-database by the token's `subject`. It runs on every request, not once in
-the callback, so a user removed from your table is refused on their next
-click even though their session at the provider is fine. Two providers,
-Google and GitHub, mapped to the same type, meet in
-`authenticateWithAnyOf`.
+`expectSuccess` decides whether a failure status is a value to inspect or
+an exception to raise: `ClientRequestException` for `4xx`,
+`ServerResponseException` for `5xx`. For a test that expects the `404`,
+build a second client without it, or check `response.status` on the
+default one.
 -->
 
 ---
 
-# Who is calling, what is allowed
+# The test is only the test
 
-- `basic<P>("…") { validate { } }` → a scheme with a principal type
-- `authenticateWith(scheme) { }` → the routes it protects; `call.principal`, never `null`
-- `session<S, P>` and `setSession` → a login that outlives its request
-- `jwt<P>` and `JWT.create() … .sign(…)` → a token instead of a session
-- `withRoles { }` and `roles = setOf(…)` → `403` per route; `rateLimit(…)` → `429` per caller
-- `install(Oidc)` and `identityProvider { issuer }` → a provider vouches
+<DrawnAnnotation text="&quot;/greet/alex/bye&quot;" label="The URL is the whole request: the helper owns everything else" :geometry="{ label: { x: 0.72, y: 0.5, width: 0.44 } }" />
 
-> **Authenticate once, authorize per route.**
+```kotlin
+import io.kotest.matchers.shouldBe
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
+import org.junit.jupiter.api.Test
+
+@Test
+fun bye() = appTest { client ->
+  client.get("/greet/alex/bye").status shouldBe HttpStatusCode.OK
+}
+```
+
+<!--
+Still inside `GreetingTest`. No set-up in sight: the helper owns it, the
+test states the request and the expectation. A renamed route shows up
+here as a `404`, and `expectSuccess` turns that into a failing test.
+-->
+
+---
+
+# The client forgets cookies unless told
+
+> Sessions from lesson 5, logins from lesson 9: the state lives in a cookie
+
+<DrawnAnnotation text="install(HttpCookies)" label="Keeps every `Set-Cookie` and sends it back: a login test can span requests" :geometry="{ label: { x: 0.72, y: 0.54, width: 0.44 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.cookies.HttpCookies
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.testing.testApplication
+
+fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
+  application { module() }
+  val client = createClient {
+    install(ContentNegotiation) { json() }
+    install(HttpCookies)
+    expectSuccess = true
+  }
+  test(client)
+}
+```
+
+<!--
+By default every request from the client is independent, which is what
+you want until the test logs in first and then asks for a protected page.
+`HttpCookies`, `io.ktor.client.plugins.cookies`, adds a cookie jar; the
+`bearerAuth` and `basicAuth` request helpers cover token-based schemes.
+-->
+
+---
+
+# Other services are mocked in the test
+
+<DrawnAnnotation text="hosts(&quot;https://api.github.com&quot;)" label="A whole `Application` playing GitHub: routes, plug-ins, failures on demand" :geometry="{ label: { x: 0.72, y: 0.28, width: 0.44 } }" />
+<DrawnAnnotation text="install(ServerContentNegotiation)" label="The server plug-in under an alias: the client's has the same name" :geometry="{ label: { x: 0.74, y: 0.53, width: 0.4 } }" />
+<DrawnAnnotation text="GitHubHttp(client())" label="`HttpClient(CIO)` leaves the process: the mock never sees this request" color="red" :geometry="{ label: { x: 0.72, y: 0.79, width: 0.44 } }" />
+
+```kotlin
+import io.kotest.matchers.shouldBe
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.install
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
+import io.ktor.server.response.respond
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+import io.ktor.server.testing.testApplication
+import org.junit.jupiter.api.Test
+
+@Test
+fun profile() = testApplication {
+  externalServices {
+    hosts("https://api.github.com") {
+      install(ServerContentNegotiation) { json() }
+      routing { get("/users/{u}") { call.respond(User("Alex", null, null)) } }
+    }
+  }
+  application { module(GitHubHttp(client())) }
+  client.get("/github/alex").status shouldBe HttpStatusCode.OK
+}
+```
+
+<!--
+Two ways to test code that talks to another service: run the real thing
+locally, Testcontainers manages the lifecycle of a database or a queue in
+Docker; or mock it. `externalServices` is the mock: every host listed
+gets an `Application` of its own, served by the test engine, so a `500`
+or a slow answer is one route away. The catch: only a client from this
+`testApplication` resolves those hosts. `GitHubHttp(client())` builds
+lesson 6's real `HttpClient(CIO)`, and that one goes to the internet.
+-->
+
+---
+magic-move
+---
+
+# Other services are mocked in the test
+
+<DrawnAnnotation text="defaultRequest { url(&quot;https://api.github.com&quot;) }" label="A test client, so the mock answers; the base URL completes the relative paths" :geometry="{ label: { x: 0.8, y: 0.6, width: 0.28 } }" />
+<DrawnAnnotation text="module(GitHubHttp(github))" label="The service gets the test client: lesson 6's DI, done by the test" :geometry="{ label: { x: 0.8, y: 0.76, width: 0.28 } }" />
+
+```kotlin
+import io.kotest.matchers.shouldBe
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.install
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
+import io.ktor.server.response.respond
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+import io.ktor.server.testing.testApplication
+import org.junit.jupiter.api.Test
+
+@Test
+fun profile() = testApplication {
+  externalServices {
+    hosts("https://api.github.com") {
+      install(ServerContentNegotiation) { json() }
+      routing { get("/users/{u}") { call.respond(User("Alex", null, null)) } }
+    }
+  }
+  val github = createClient {
+    install(ContentNegotiation) { json() }
+    defaultRequest { url("https://api.github.com") }
+  }
+  application { module(GitHubHttp(github)) }
+  client.get("/github/alex").status shouldBe HttpStatusCode.OK
+}
+```
+
+<!--
+The module takes the service as a parameter, the interface from lesson
+5, so the test hands it an implementation built on a test client. The
+mock answers `/users/alex`; `/users/alex/repos` has no route, `404`, and
+`GitHubHttp` turns that into an empty list. Mocks are fast and can fail
+on command; they are also not the real thing, so keep one integration
+test against the real API, or a container, for the contract.
+-->
+
+---
+
+# The service is tested without a server
+
+<DrawnAnnotation text="MockEngine { request ->" label="`ktor-client-mock`: an engine that answers from a lambda, no socket" :geometry="{ label: { x: 0.74, y: 0.32, width: 0.46 } }" />
+<DrawnAnnotation text="GitHubHttp(client)" label="Lesson 6's implementation, alone: no `testApplication`, no routes" :geometry="{ label: { x: 0.47, y: 0.807, width: 0.7 } }" />
+<DrawnAnnotation text="runTest" label="`kotlinx-coroutines-test`: a `suspend` test body" :geometry="{ label: { x: 0.62, y: 0.242, width: 0.48 } }" />
+
+```kotlin
+import io.kotest.matchers.shouldBe
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.http.HttpHeaders
+import io.ktor.http.headersOf
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Test
+
+@Test
+fun userInfo() = runTest {
+  val engine = MockEngine { request ->
+    respond(
+      content = """{"name": "Alex", "bio": null, "avatar_url": null}""",
+      headers = headersOf(HttpHeaders.ContentType, "application/json"),
+    )
+  }
+  val client = HttpClient(engine) {
+    install(ContentNegotiation) { json() }
+    defaultRequest { url("https://api.github.com") }
+  }
+  GitHubHttp(client).getUserInfo("alex")?.name shouldBe "Alex"
+}
+```
+
+<!--
+The other unit: `externalServices` tests the route and the service
+together, `MockEngine` tests the service and nothing else. The engine is
+the client's lowest layer, so every plug-in above it, `ContentNegotiation`
+included, runs for real; `request.url.encodedPath` in the lambda
+branches on the path, `respondError(HttpStatusCode.NotFound)` plays a
+missing user. Both mocks are fast and both lie a little; the contract
+test against GitHub stays.
+-->
+
+---
+
+# Metrics are a plug-in with a registry
+
+> Which routes are hit, how long they take, how often they fail
+
+<DrawnAnnotation text="PrometheusMeterRegistry" label="One registry per back-end: Prometheus here, JMX or Datadog are another artifact" :geometry="{ label: { x: 0.72, y: 0.4, width: 0.44 } }" />
+<DrawnAnnotation text="install(MicrometerMetrics)" label="`ktor-server-metrics-micrometer`: a timer per request, tagged with route and status" :geometry="{ label: { x: 0.72, y: 0.54, width: 0.44 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.metrics.micrometer.MicrometerMetrics
+import io.micrometer.prometheusmetrics.PrometheusConfig
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
+
+val prometheus = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
+
+fun Application.module() {
+  install(MicrometerMetrics) {
+    registry = prometheus
+  }
+  routes()
+}
+```
+
+<!--
+A clear picture of how a service is used: when does it crash, which
+endpoints carry the load, which operations are slow. Micrometer is the
+facade, like SLF4J for logging: the code records timers, counters,
+gauges, and distributions against a `MeterRegistry`, and the registry
+implementation decides where they go. `micrometer-registry-prometheus`
+1.13+ moved the classes to `io.micrometer.prometheusmetrics`. The
+plug-in also registers JVM memory, GC, and CPU meters by default.
+-->
+
+---
+magic-move
+---
+
+# Metrics are a plug-in with a registry
+
+> Which routes are hit, how long they take, how often they fail
+
+<DrawnAnnotation text="prometheus.scrape()" label="Every metric as text, in the format Prometheus reads" :geometry="{ label: { x: 0.76, y: 0.59, width: 0.36 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.metrics.micrometer.MicrometerMetrics
+import io.ktor.server.response.respond
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+import io.micrometer.prometheusmetrics.PrometheusConfig
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
+
+val prometheus = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
+
+fun Application.module() {
+  install(MicrometerMetrics) {
+    registry = prometheus
+  }
+  routing {
+    get("/metrics") { call.respond(prometheus.scrape()) }
+  }
+  routes()
+}
+```
+
+<!--
+Prometheus pulls: it does not receive metrics, it fetches them from an
+endpoint on a schedule. `scrape()` renders the registry in its text
+format, and a route serves it. Hide it from the OpenAPI document with
+`.hide()`, and from the internet with a separate port or the auth of
+lesson 9.
+-->
+
+---
+
+# The scrape is plain text
+
+<DrawnAnnotation text="ktor_http_server_requests_seconds_count" label="One timer per route and status: count, sum, max; Prometheus derives the rates" :geometry="{ label: { x: 0.78, y: 0.39, width: 0.32 } }" />
+<DrawnAnnotation text="status=&quot;500&quot;" label="Status is a tag: errors are a query, not another metric" :geometry="{ label: { x: 0.72, y: 0.72, width: 0.44 } }" />
+
+```http
+GET /metrics HTTP/1.1
+Host: localhost:8080
+
+HTTP/1.1 200 OK
+Content-Type: text/plain; charset=UTF-8
+
+# TYPE ktor_http_server_requests_seconds summary
+ktor_http_server_requests_seconds_count{route="/health",status="200"} 42
+ktor_http_server_requests_seconds_sum{route="/health",status="200"} 0.213
+ktor_http_server_requests_seconds_count{route="/health",status="500"} 1
+```
+
+<!--
+Trimmed: every series also carries `address`, `method`, and `throwable`
+tags, and the JVM meters come before it. The name is Micrometer's
+`ktor.http.server.requests` with dots turned to underscores and the base
+unit appended. A Prometheus query such as
+`rate(ktor_http_server_requests_seconds_count[5m])` gives requests per
+second; `_sum / _count` the average latency.
+-->
+
+---
+
+# Prometheus pulls from `/metrics`
+
+> `prometheus.yml`, next to the `prometheus` binary; the UI is on `localhost:9090`
+
+<DrawnAnnotation text="job_name: &quot;ktor&quot;" label="The `job` label on every series from this server" :geometry="{ label: { x: 0.76, y: 0.36, width: 0.36 } }" />
+<DrawnAnnotation text="targets: [&quot;localhost:8080&quot;]" label="Scraped every 15 s, at `/metrics` by default" :geometry="{ label: { x: 0.76, y: 0.5, width: 0.36 } }" />
+
+```yaml
+scrape_configs:
+  - job_name: "ktor"
+    static_configs:
+      - targets: ["localhost:8080"]
+```
+
+<!--
+Download from `prometheus.io`, unpack, add the job, run `./prometheus`.
+The web UI at `localhost:9090` has the expression browser and graphs;
+Grafana usually sits on top for dashboards. `metrics_path` changes the
+endpoint, `scrape_interval` the cadence; in production the targets come
+from service discovery rather than a static list.
+-->
+
+---
+
+# Timers carry your tags
+
+<DrawnAnnotation text="timers { call, throwable ->" label="Runs per request on the `Timer.Builder`: route, method, status are already there" :geometry="{ label: { x: 0.72, y: 0.39, width: 0.44 } }" />
+<DrawnAnnotation text="call.request.headers[&quot;X-Premium&quot;]" label="A tag is a dimension: premium and free traffic side by side in one query" :geometry="{ label: { x: 0.72, y: 0.53, width: 0.44 } }" />
+
+<Warning :line="6" text="throwable" message="Parameter 'throwable' is never used, could be renamed to _">
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.metrics.micrometer.MicrometerMetrics
+import io.micrometer.prometheusmetrics.PrometheusConfig
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
+
+val prometheus = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
+
+fun Application.module() {
+  install(MicrometerMetrics) {
+    registry = prometheus
+    timers { call, throwable ->
+      tag("premium", call.request.headers["X-Premium"] ?: "no")
+    }
+  }
+  routes()
+}
+```
+
+</Warning>
+
+<!--
+The block sees the call and the exception, if there was one, and may add
+tags to the request timer. Keep tags low-cardinality: a plan, a region, a
+client version. A user id or a request id as a tag creates one series per
+value and brings Prometheus to its knees; that is what logs and traces
+are for.
+-->
+
+---
+
+# Your own counters use the same registry
+
+<DrawnAnnotation text="registry: MeterRegistry" label="The Micrometer interface, not the Prometheus class: provided by DI, swapped in tests" :geometry="{ label: { x: 0.72, y: 0.45, width: 0.44 } }" />
+<DrawnAnnotation text="registry.counter(&quot;bye&quot;).increment()" label="Counters, gauges, timers, distributions: the whole Micrometer API" :geometry="{ label: { x: 0.76, y: 0.29, width: 0.36 } }" />
+
+```kotlin
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.RoutingContext
+import io.micrometer.core.instrument.MeterRegistry
+
+suspend fun RoutingContext.bye(registry: MeterRegistry, name: String) {
+  registry.counter("bye").increment()
+  call.respondText("Bye, $name")
+}
+```
+
+<!--
+The request timer comes for free; business numbers are yours to record.
+A counter only goes up, goodbyes said; a gauge samples a value, users
+online; a timer records durations; a distribution summary any other
+number. `registry.counter("bye", "lang", lang)` adds tags. Behind an
+interface the metrics back-end is a detail: `SimpleMeterRegistry` in a
+test, Prometheus in production, both through `ktor-server-di`.
+-->
+
+---
+
+# Every application has a logger
+
+<DrawnAnnotation text="log.info(" label="`Application.log`: SLF4J, behind the generator's `logback.xml`" :geometry="{ label: { x: 0.73, y: 0.242, width: 0.46 } }" />
+<DrawnAnnotation text="call.application.log" label="The same logger from a handler" :geometry="{ label: { x: 0.84, y: 0.43, width: 0.32 } }" />
+<DrawnAnnotation text="&quot;{} is leaving&quot;, name" label="A placeholder, not a template: formatted only when the level is on" :geometry="{ label: { x: 0.73, y: 0.5, width: 0.5 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.log
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+import io.ktor.server.util.getValue
+
+fun Application.module() {
+  log.info("Greetings module loaded")
+  routing {
+    get("/greet/{name}/bye") {
+      val name: String by call.pathParameters
+      call.application.log.warn("{} is leaving", name)
+      call.respondText("Bye, $name")
+    }
+  }
+}
+```
+```console
+INFO  Application - Greetings module loaded
+WARN  Application - alex is leaving
+```
+
+<!--
+The metrics say how often; the log says what happened. `log` is the
+SLF4J logger of the application, the same facade the whole JVM uses,
+and logback behind it is what the generator's `logback.xml` configures:
+levels per package, `io.ktor` at `INFO`, the format of a line. The
+`Logger` interface earlier in this lesson stood in for this one. Log
+with placeholders, never `"$name is leaving"`: the string is only built
+when `WARN` is enabled, and the arguments stay separate for a JSON
+encoder. `KtorSimpleLogger("name")` is the multiplatform variant.
+-->
+
+---
+
+# `CallLogging` writes one line per request
+
+<DrawnAnnotation text="install(CallLogging)" label="`ktor-server-call-logging`: method, path, status, duration, after the response" :geometry="{ label: { x: 0.66, y: 0.242, width: 0.6 } }" />
+<DrawnAnnotation text="filter { call ->" label="Not the scrape: Prometheus every 15 seconds would drown the log" :geometry="{ label: { x: 0.55, y: 0.384, width: 0.7 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.request.path
+import org.slf4j.event.Level
+
+fun Application.module() {
+  install(CallLogging) {
+    level = Level.INFO
+    filter { call -> !call.request.path().startsWith("/metrics") }
+  }
+  routes()
+}
+```
+```console
+INFO  Application - 200 OK: GET - /greet/alex/bye in 3ms
+INFO  Application - 404 Not Found: GET - /nowhere in 1ms
+```
+
+<!--
+The access log, as a plug-in. One line per call after it completes, at
+the level you choose, for the calls the filter keeps. `format { call -> }`
+writes your own line; `mdc("user") { call -> … }` computes a value once
+per request and puts it in the MDC, the mapped diagnostic context, so
+every line logged while that request runs carries it, from any class.
+That is what the next slide uses.
+-->
+
+---
+magic-move
+---
+
+# `CallId` correlates the lines
+
+<DrawnAnnotation text="header(HttpHeaders.XRequestId)" label="Reuse the caller's or the proxy's id, and echo it back" :geometry="{ label: { x: 0.72, y: 0.289, width: 0.5 } }" />
+<DrawnAnnotation text="generate(length = 12)" label="Otherwise mint one" :geometry="{ label: { x: 0.52, y: 0.336, width: 0.3 } }" />
+<DrawnAnnotation text="callIdMdc(&quot;call-id&quot;)" label="Into the MDC: `%X{call-id}` in `logback.xml` puts it on every line of the request" :geometry="{ label: { x: 0.66, y: 0.6, width: 0.6 } }" />
+
+```kotlin
+import io.ktor.http.HttpHeaders
+import io.ktor.server.application.Application
+import io.ktor.server.application.install
+import io.ktor.server.plugins.callid.CallId
+import io.ktor.server.plugins.callid.callIdMdc
+import io.ktor.server.plugins.callid.generate
+import io.ktor.server.plugins.calllogging.CallLogging
+import io.ktor.server.request.path
+import org.slf4j.event.Level
+
+fun Application.module() {
+  install(CallId) {
+    header(HttpHeaders.XRequestId)
+    generate(length = 12)
+  }
+  install(CallLogging) {
+    level = Level.INFO
+    filter { call -> !call.request.path().startsWith("/metrics") }
+    callIdMdc("call-id")
+  }
+  routes()
+}
+```
+```console
+INFO  [k7d2m9x1q4z8] Application - alex is leaving
+INFO  [k7d2m9x1q4z8] Application - 200 OK: GET - /greet/alex/bye in 3ms
+```
+
+<!--
+A request touches several classes and, with lesson 6's client, several
+services; without an id the lines of one request are scattered between
+the lines of every other. `CallId` establishes one per call: taken from
+`X-Request-ID` when the caller or the proxy sent it, generated
+otherwise, and echoed in the response so the client can quote it. The
+MDC puts it on every log line, and `ktor-client-call-id` forwards it to
+the services this one calls. A metric is a tag, a log line has an id,
+and the step after that, one span per call across services, is the
+`ktor-server-opentelemetry` plug-in.
+-->
+
+---
+
+# Failures, tests, and numbers
+
+- `StatusPages { status(…), exception<T> { } }` → every failure, your page
+- `RequestValidation { validate<T> { } }` → a bad body is a `400`, with reasons
+- `createApplicationPlugin { transformBody { } }` → your own hook
+- `testApplication { }`, `MockEngine { }` → one process, or no server at all
+- `checkAll(Arb.string())`, `externalServices { }` → generated, mocked
+- `MicrometerMetrics`, `CallLogging`, `CallId` → numbers, lines, an id per request
+
+> **A failure is a response, a test is a call, a metric is a tag, a log line has an id.**
 >
-> The handler only sees the principal.
+> Never the exception message; always the same pipeline.
 
 ---
 layout: intro
@@ -1437,10 +1049,10 @@ kodee: heart
 
 <div class="lesson-number">Exercise</div>
 
-# Protect the greetings four ways
+# Handle, test, and measure the greetings
 
-- Guard the greeting routes with `basic<UserIdPrincipal>` and `checkCredentials`
-- `POST /login` stores a `UserInfo`; guard with `session<UserInfo, UserIdPrincipal>`
-- Issue a JWT from `/login` instead and verify it with `jwt<UserIdPrincipal>`
-- Require `Role.Admin` with `withRoles`; read the secret from configuration
-- Accept an OpenID Connect provider's tokens with `jwtBearer`
+- Map `NotFound` and your own exception to HTML pages with `StatusPages`
+- Test the greeting routes with `testApplication` behind an `appTest` helper
+- Add a property test with `checkAll(Arb.string())` and decide what it finds
+- Expose `/metrics` with `MicrometerMetrics` and a Prometheus registry
+- Scrape it with a local Prometheus and graph requests per route

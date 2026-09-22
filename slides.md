@@ -45,14 +45,15 @@ kodee: wave
 # Today’s route
 
 1. Your first Ktor server
-2. Requests and responses
-3. Typed parameters and HTML
-4. Sessions and static content
-5. Talking to other services
-6. WebSockets and OpenAPI
-7. Status pages, testing and metrics
-8. Authentication and authorization
-9. Configuration and deployment
+2. Server and configuration
+3. Requests and responses
+4. Typed parameters and HTML
+5. Sessions and static content
+6. Talking to other services
+7. WebSockets and OpenAPI
+8. Status pages, testing and metrics
+9. Authentication and authorization
+10. Deployment
 
 ---
 src: ./lessons/lesson-1.md
@@ -80,6 +81,9 @@ src: ./lessons/lesson-8.md
 ---
 ---
 src: ./lessons/lesson-9.md
+---
+---
+src: ./lessons/lesson-10.md
 ---
 ---
 src: ./lessons/closing.md

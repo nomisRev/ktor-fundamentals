@@ -4,14 +4,21 @@
 package presentation.snippets.lesson1.slide22
 
 import presentation.support.*
+import io.ktor.http.ContentType.Audio
+import io.ktor.http.ContentType.Image
+import io.ktor.http.ContentType.Text
+import io.ktor.http.ContentType.Video
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.plugins.compression.Compression
+import io.ktor.server.plugins.compression.CompressionConfig
+import io.ktor.server.plugins.compression.deflate
+import io.ktor.server.plugins.compression.excludeContentType
+import io.ktor.server.plugins.compression.gzip
+import io.ktor.server.plugins.compression.identity
+import io.ktor.server.plugins.compression.minimumSize
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
 
 fun Application.module() {
   install(ContentNegotiation) { json() }
@@ -28,3 +35,4 @@ fun Application.module() {
 
     excludeContentType(Audio.Any, Video.Any, Image.Any, Text.EventStream)
   }
+}

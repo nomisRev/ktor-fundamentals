@@ -61,8 +61,6 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
   implementation("io.micrometer:micrometer-registry-prometheus:1.17.1")
   implementation("com.auth0:java-jwt:4.6.0")
-  implementation("com.sksamuel.hoplite:hoplite-core:2.9.0")
-  implementation("com.sksamuel.hoplite:hoplite-hocon:2.9.0")
   implementation("ch.qos.logback:logback-classic:1.6.3")
   implementation("io.kotest:kotest-runner-junit5:6.2.4")
   implementation("io.kotest:kotest-assertions-core:6.2.4")

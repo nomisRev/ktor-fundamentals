@@ -7,7 +7,6 @@ dependencies:
   - io.ktor:ktor-server-core:3.6.0
   - io.ktor:ktor-server-netty:3.6.0
   - io.ktor:ktor-server-config-yaml:3.6.0
-  - com.auth0:java-jwt:4.6.0
 
 test-dependencies:
   - io.ktor:ktor-server-test-host:3.6.0

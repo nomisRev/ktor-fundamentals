@@ -68,10 +68,12 @@ from its surroundings to `src/main/kotlin/presentation/support/`.
 
 `exercises/` is a [Kotlin Toolchain](https://kotlin-toolchain.org) project with
 one module per exercise slide, in deck order: `first-server` (lesson 1),
-`requests-and-responses` (lesson 2), `type-safe-routing` (lesson 3),
-`sessions-and-static` (lesson 4), `http-client` (lesson 5),
-`websockets-and-openapi` (lesson 6), `status-pages-and-testing` (lesson 7),
-`authentication` (lesson 8) and `configuration` (lesson 9). Every code-shaped
+`configuration` (lesson 2), `requests-and-responses` (lesson 3),
+`type-safe-routing` (lesson 4), `sessions-and-static` (lesson 5),
+`http-client` (lesson 6), `websockets-and-openapi` (lesson 7),
+`status-pages-and-testing` (lesson 8) and `authentication` (lesson 9);
+the deployment exercise of lesson 10 is not code and lives in
+`deployment/README.md`. Every code-shaped
 bullet of a slide is an exercise with a JUnit test that starts the module
 with `testApplication` and pins the behaviour over HTTP; the KDoc in the
 module's source file states the task. The bullets that are not code

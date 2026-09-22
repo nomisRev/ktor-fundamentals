@@ -1,10 +1,5 @@
-# Exercise 1 / 2: move the port and the JWT secret here.
+# Exercise 1 / 3: the host and the port live here, not in main.
 #
-# Add `ktor.deployment.port` with the value "$PORT:8080" (the PORT variable,
-# 8080 when it is not set) and `jwt.secret` with the value
-# "$JWT_SECRET:change-me". `EngineMain` reads this file; nothing in the
-# source knows either value.
-ktor:
-  application:
-    modules:
-      - configuration.ApplicationKt.module
+# Add a `server` section with `host: "$HOST:0.0.0.0"` and `port: "$PORT:8080"`:
+# the environment variable when it is set, the value after the colon when it
+# is not. Nothing in the source knows either value.

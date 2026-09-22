@@ -8,111 +8,465 @@ kodee: wave
 
 <div class="lesson-number">Lesson 6</div>
 
-# WebSockets and OpenAPI
+# Talking to other services
 
-## Two-way messages, described APIs
-
----
-
-# HTTP answers, a WebSocket stays open
-
-> One request, one response; or one connection both sides write to
-
-| `HTTP/1.1 101 Switching Protocols` | the handshake: a `GET` with `Upgrade: websocket`     |
-|------------------------------------|-------------------------------------------------------|
-| `Frame.Text`, `Frame.Binary`       | messages, in either direction, at any time            |
-| `Frame.Ping`, `Frame.Pong`         | keep the connection alive; Ktor answers them for you  |
-| `Frame.Close`                      | a graceful end, with a code and a reason              |
-
-<!--
-HTTP is fire-and-forget: the client asks, the server answers, the
-connection is done. A WebSocket starts as an HTTP request and, after the
-`101`, stays open: either side sends a frame whenever it wants. Every
-browser speaks it natively, no plug-in needed. The handshake, the pings,
-and the close are handled by Ktor; the frames in between are ours.
--->
+## The client, coroutines, and services
 
 ---
 
-# WebSockets are a plug-in
+# The client is the same framework
 
-<DrawnAnnotation text="install(WebSockets)" label="`ktor-server-websockets`; the client has a plug-in of its own" :geometry="{ label: { x: 0.4593, y: 0.2744, width: 0.4000 } }" />
+> Plug-ins, serialization, coroutines: the server's tools, pointed the other way
+
+<DrawnAnnotation text="CIO" label="HttpEngine; Many choices depending on platform" on="0" color="var(--fundamentals-blue)"  :geometry="{ label: { x: 0.6626, y: 0.3000 } }"/>
+<DrawnAnnotation text="ContentNegotiation" label="Same name as the server plug-in, different package: `io.ktor.client.plugins`" on="1" :geometry="{ label: { x: 0.7206, y: 0.4351, width: 0.3600 } }" />
+<DrawnAnnotation text="ignoreUnknownKeys = true" label="GitHub sends more fields than we model" color="var(--fundamentals-pink)" on="2" :geometry="{ label: { x: 0.3168, y: 0.5439, width: 0.3600 } }" />
 
 ```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.websocket.WebSockets
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
 
-fun Application.module() {
-  install(WebSockets)
-  routes()
-}
-```
-
-<!--
-The defaults are fine for almost everyone: `pingPeriod` (off by default,
-set it to keep proxies from dropping idle connections), `timeout`,
-`maxFrameSize`, `masking`. `ktor-client-websockets` installs the same
-plug-in on the client, `io.ktor.client.plugins.websocket.WebSockets`.
--->
-
----
-
-# A handler loops over `incoming`
-
-<DrawnAnnotation text="webSocket(&quot;/greet&quot;)" label="A `GET /greet` that upgrades: the block runs for the whole connection" on="0" :geometry="{ label: { x: 0.5927, y: 0.3037, width: 0.4000 } }" />
-<DrawnAnnotation text="for (frame in incoming)" label="`incoming` is a channel of frames; the loop ends when the socket closes" on="1" :geometry="{ label: { x: 0.5650, y: 0.3744, width: 0.4000 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.routing.routing
-import io.ktor.server.websocket.webSocket
-import io.ktor.websocket.Frame
-import io.ktor.websocket.readText
-import io.ktor.websocket.send
-
-fun Application.routes() {
-  routing {
-    webSocket("/greet") {
-      for (frame in incoming) {
-        when (frame) {
-          is Frame.Text -> send("Hello, ${frame.readText()}")
-          else -> {}
-        }
-      }
-    }
+fun client(): HttpClient = HttpClient(CIO) {
+  install(ContentNegotiation) {
+    json(Json { ignoreUnknownKeys = true })
   }
 }
 ```
+
+<!--
+`ktor-client-core` plus one engine: `CIO` here, `OkHttp` or `Android` on
+Android, `Darwin` on Apple platforms, `Js` in the browser. The plug-ins are
+`ktor-client-content-negotiation` and friends; the JSON
+converter is the same `ktor-serialization-kotlinx-json` as on the server.
+Same names, different packages: let the IDE import `io.ktor.client.plugins.*`
+and not `io.ktor.server.plugins.*`, the compiler will not warn you.
+-->
 
 ---
 magic-move
 ---
 
-# A handler loops over `incoming`
+# The client is the same framework
 
-<DrawnAnnotation text="is Frame.Text" label="Frames are types: text here; binary, ping, and close take other branches" on="0" :geometry="{ label: { x: 0.4963, y: 0.5142, width: 0.4200 } }" />
-<DrawnAnnotation text="send(" label="`send` writes one text frame to `outgoing`" on="1" :geometry="{ label: { x: 0.4746, y: 0.5153, width: 0.3600 } }" />
+> Plug-ins, serialization, coroutines: the server's tools, pointed the other way
 
-<TypeHint :line="3" receiver="DefaultWebSocketServerSession">
-<SmartCast :line="6" text="frame">
+<DrawnAnnotation text="defaultRequest" label="Every request starts from the base URL; a request only adds the path" :geometry="{ label: { x: 0.3965, y: 0.6941, width: 0.4000 } }" />
 
 ```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.routing.routing
-import io.ktor.server.websocket.webSocket
-import io.ktor.websocket.Frame
-import io.ktor.websocket.readText
-import io.ktor.websocket.send
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
 
-fun Application.routes() {
-  routing {
-    webSocket("/greet") {
-      for (frame in incoming) {
-        when (frame) {
-          is Frame.Text -> send("Hello, ${frame.readText()}")
-          else -> {}
-        }
+fun client(): HttpClient = HttpClient(CIO) {
+  install(ContentNegotiation) {
+    json(Json { ignoreUnknownKeys = true })
+  }
+  defaultRequest { url("https://api.github.com") }
+}
+```
+
+<!--
+`defaultRequest` is also where a shared header goes: an `Authorization`
+token for GitHub, a `User-Agent`, an `Accept`. Everything set here is the
+starting point of every request; the request block can still override it.
+-->
+
+---
+
+# The schema is a `@Serializable` class
+
+```kotlin
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class User(
+  val name: String?,
+  val bio: String?,
+  @SerialName("avatar_url") val avatarUrl: String?,
+)
+
+@Serializable
+data class Repo(
+  val name: String,
+  val description: String?,
+  val fork: Boolean,
+  @SerialName("stargazers_count") val stargazersCount: Int,
+)
+```
+
+---
+
+# A request is a verb and a URL
+
+<DrawnAnnotation text="HttpClient" />
+<DrawnAnnotation text="get(&quot;/users/$user&quot;)" label="The verb is the function, the path completes `defaultRequest`: `GET /users/alex`" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+
+suspend fun HttpClient.github(user: String) {
+  val response = get("/users/$user")
+}
+```
+
+<!--
+`get` here is `io.ktor.client.request.get`: a relative URL is resolved
+against `defaultRequest`, an absolute `"https://…"` goes where it says.
+`HttpClient` is `Closeable`: a per-request client is the simplest thing that
+works and the wrong thing to keep, every instance owns a connection pool.
+-->
+
+---
+magic-move
+---
+
+# A request is a verb and a URL
+
+<DrawnAnnotation text="response.status" label="`HttpResponse`: status, headers, and a body still on the wire" color="var(--fundamentals-blue)" :geometry="{ label: { x: 0.6284, y: 0.2710, width: 0.3600 } }" />
+<DrawnAnnotation text="response.body<User>()" label="Deserialized by `ContentNegotiation`, the mirror of `call.receive`" :geometry="{ label: { x: 0.5178, y: 0.4298, width: 0.4671 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
+
+suspend fun HttpClient.github(user: String) {
+  val response = get("/users/$user")
+  when (response.status) {
+    HttpStatusCode.OK -> response.body<User>()
+    else -> TODO()
+  }
+}
+```
+
+<!--
+`body<T>()` reads and converts in one go; `bodyAsText()` gives the raw
+string. Both consume the body, so read it once. `response.headers`,
+`response.contentType()`, `response.request` are all there for the asking.
+-->
+
+---
+
+# The request block carries the body
+
+<DrawnAnnotation text="client.post(&quot;/repos/$owner/$repo&quot;) {" label="Same URL style, other verb; the block adds headers, query, body" :geometry="{ label: { x: 0.7408, y: 0.2670, width: 0.3600 } }" />
+<DrawnAnnotation text="contentType(" />
+<DrawnAnnotation text="setBody(" label="Serialized by the same `ContentNegotiation`; `contentType` says as what" :geometry="{ label: { x: 0.4475, y: 0.4093, width: 0.5468 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+
+suspend fun HttpClient.describe(owner: String, repo: String, text: String) {
+  post("/repos/$owner/$repo") {
+    contentType(ContentType.Application.Json)
+    setBody(mapOf("description" to text))
+  }
+}
+```
+
+<!--
+Every request function takes the same optional block: `header(…)`,
+`parameter(…)`, `accept(…)`, `bearerAuth(…)`, `timeout { }`. Without
+`contentType` the converter does not know it should run, and the body goes
+out as text. GitHub actually wants `PATCH` for this one; `patch` exists too.
+-->
+
+---
+
+# The client suspends, so does the handler
+
+<DrawnAnnotation text="suspend" label="Waits for the network without holding a thread" :geometry="{ label: { x: 0.74, y: 0.27, width: 0.36 } }" />
+
+```kotlin no-compile
+public suspend inline fun HttpClient.get(
+  urlString: String,
+  block: HttpRequestBuilder.() -> Unit = {},
+): HttpResponse
+```
+
+<DrawnAnnotation text="suspend" label="The whole pipeline is a coroutine: no callbacks, no thread per request" :geometry="{ label: { x: 0.76, y: 0.53, width: 0.36 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.request.get
+
+suspend fun HttpClient.github(user: String) {
+  get("/users/$user")
+}
+```
+
+<!--
+The keyword has been on every handler since lesson 1. Coroutines are
+Kotlin's structured concurrency: a suspending call reads like a blocking
+one, no `async`/`await` at every call site, no `flatMap` chains, no thread
+management, and the same code on every platform. The engine parks the
+coroutine while the bytes travel and resumes it on any free thread.
+-->
+
+---
+
+# Blocking code goes to `Dispatchers.IO`
+
+> Not everything suspends: JDBC, `java.io`, a legacy SDK
+
+<DrawnAnnotation text="File(&quot;uploads/$name.png&quot;).readBytes()" label="Blocks its thread until the disk answers" color="red" :geometry="{ label: { x: 0.6776, y: 0.4587, width: 0.4300 } }" />
+<DrawnAnnotation text="withContext(Dispatchers.IO)" label="A pool for blocking; the handler suspends" :geometry="{ label: { x: 0.7310, y: 0.3608, width: 0.4300 } }" />
+
+```kotlin
+import io.ktor.http.ContentType
+import io.ktor.server.response.respondBytes
+import io.ktor.server.routing.RoutingContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
+
+suspend fun RoutingContext.avatar(name: String) {
+  val bytes = withContext(Dispatchers.IO) {
+    File("uploads/$name.png").readBytes()
+  }
+  call.respondBytes(bytes, ContentType.Image.PNG)
+}
+```
+
+<!--
+The engine runs handlers on a few threads, one per core or so, which is
+why a suspended handler costs nothing. A blocked thread is the opposite:
+a JDBC query, a file read, a client library without a `suspend` API holds
+one of those few threads until it returns, and a handful of slow calls
+stall every other request. `withContext(Dispatchers.IO)` moves the call
+to a pool made for blocking, 64 threads by default, and suspends the
+handler in the meantime. Never `runBlocking` inside a handler; a library
+with its own coroutine support, Exposed's `suspendTransaction` or an
+R2DBC driver, does not need the switch.
+-->
+
+---
+
+# Concurrent requests share a scope
+
+<DrawnAnnotation text="coroutineScope {" label="`async` needs a scope: nothing outlives the handler" :geometry="{ label: { x: 0.6260, y: 0.4853, width: 0.2800 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+
+suspend fun HttpClient.github(user: String): Profile = coroutineScope {
+  val info = async { get("/users/$user").body<User>() }
+  val repos = async { get("/users/$user/repos").body<List<Repo>>() }
+  Profile(info.await(), repos.await())
+}
+```
+
+<!--
+`async` starts a child coroutine and hands back a `Deferred`; `await`
+suspends until it has a value. Back to back they are a sequential call with
+extra steps, `withContext` would say the same thing. The scope is the point:
+if the handler is cancelled, so are its children; if a child fails, the
+handler fails.
+-->
+
+---
+
+# Retries are a client plug-in
+
+> The other side is down, or overloaded, or waking up
+
+<DrawnAnnotation text="retryOnServerErrors(maxRetries = 5)" label="5xx only: a `404` will not change its mind, an exception does not count" :geometry="{ label: { x: 0.6509, y: 0.6131, width: 0.4000 } }" />
+<DrawnAnnotation text="constantDelay(millis = 1000)" label="A second between attempts, plus up to a second of jitter" :geometry="{ label: { x: 0.3520, y: 0.7210, width: 0.3600 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+
+fun client(): HttpClient = HttpClient(CIO) {
+  install(ContentNegotiation) {
+    json(Json { ignoreUnknownKeys = true })
+  }
+  defaultRequest { url("https://api.github.com") }
+  install(HttpRequestRetry) {
+    retryOnServerErrors(maxRetries = 5)
+    constantDelay(millis = 1000)
+  }
+}
+```
+
+<!--
+`HttpRequestRetry` ships with `ktor-client-core`. `retryOnException` covers
+connection failures, `retryOnExceptionOrServerErrors` both; `retryIf { }`
+takes any predicate on request and response. Only retry what is safe to
+repeat: a `GET` yes, a `POST` that creates something, think first.
+-->
+
+---
+magic-move
+---
+
+# Retries are a client plug-in
+
+> Retry is simple; circuit breakers live in libraries
+
+<DrawnAnnotation text="exponentialDelay()" label="1 s, 2 s, 4 s, 8 s: room for a server that is waking up; honours `Retry-After`" :geometry="{ label: { x: 0.4376, y: 0.7191, width: 0.4400 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+
+fun client(): HttpClient = HttpClient(CIO) {
+  install(ContentNegotiation) {
+    json(Json { ignoreUnknownKeys = true })
+  }
+  defaultRequest { url("https://api.github.com") }
+  install(HttpRequestRetry) {
+    retryOnServerErrors(maxRetries = 5)
+    exponentialDelay()
+  }
+}
+```
+
+<!--
+Exponential back-off: `base ^ (attempt - 1) * 1000 ms`, capped at a minute,
+plus jitter so that a thousand clients do not retry in lockstep. Beyond
+retries there are circuit breakers and bulkheads: the client stops here
+on purpose. Resilience4j (with its Kotlin module) and Arrow's resilience
+package provide them as `suspend`-friendly building blocks. The server
+side of the same story, refusing callers who ask too often, is Ktor's own
+`RateLimit` plug-in, lesson 9.
+-->
+
+---
+magic-move
+---
+
+# A time-out is a client plug-in too
+
+> Without one, a silent server holds the request forever
+
+<DrawnAnnotation text="install(HttpTimeout)" label="`ktor-client-core`; expiry is an exception, which `retryOnException` may retry" :geometry="{ label: { x: 0.6070, y: 0.7654, width: 0.5000 } }" />
+<DrawnAnnotation text="requestTimeoutMillis = 5_000" label="Whole exchange; `connectTimeoutMillis` and `socketTimeoutMillis` for the parts" :geometry="{ label: { x: 0.4988, y: 0.8572, width: 0.8000 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
+import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.json.Json
+
+fun client(): HttpClient = HttpClient(CIO) {
+  install(ContentNegotiation) {
+    json(Json { ignoreUnknownKeys = true })
+  }
+  defaultRequest { url("https://api.github.com") }
+  install(HttpRequestRetry) {
+    retryOnServerErrors(maxRetries = 5)
+    exponentialDelay()
+  }
+  install(HttpTimeout) {
+    requestTimeoutMillis = 5_000
+  }
+}
+```
+
+---
+
+# A service is an interface
+
+> Depend on the interface, never on the HTTP client
+
+<DrawnAnnotation text="suspend fun getUserInfo" label="`suspend` almost everywhere: the pipeline can wait on it" :geometry="{ label: { x: 0.7008, y: 0.3196, width: 0.3200 } }" />
+<DrawnAnnotation text="List<Repo>?" label="`null` when there is no such user: no `HttpStatusCode` leaks out" color="var(--fundamentals-blue)" :geometry="{ label: { x: 0.7390, y: 0.5513, width: 0.3200 } }" />
+
+```kotlin
+interface GitHubService {
+  suspend fun getUserInfo(user: String): User?
+  suspend fun getUserRepos(user: String): List<Repo>?
+}
+```
+
+<!--
+A server is not self-sufficient: databases, queues, caches, other HTTP
+APIs. Each one is a service, and the handler talking to `HttpClient`
+directly was tied to one implementation and impossible to test without
+GitHub. Keep services focused, a catch-all `Database` service helps
+nobody. When several routes need the same set, bundle them in one class:
+`class UserService(github: GitHubService, cache: CacheService) :
+GitHubService by github, CacheService by cache`, one dependency instead of
+several.
+-->
+
+---
+
+# A service is an interface
+
+> Depend on the interface, never on the HTTP client
+
+```kotlin
+sealed interface CreateRepoResult
+data class Succces(val repo: Repo): CreateRepoResult
+data object UserNotFound : CreateRepoResult
+data object RepoAlreadyExists : CreateRepoResult
+
+interface GitHubService {
+  suspend fun getUserInfo(user: String): User?
+  suspend fun getUserRepos(user: String): List<Repo>?
+  suspend fun createRepo(user: String, repo: String): CreateRepoResult
+}
+```
+
+---
+
+# Handlers depend on the service
+
+<DrawnAnnotation text="github: GitHubService" label="A fake in tests, `GitHubHttp` in `module()`: the handler cannot tell" :geometry="{ label: { x: 0.8, y: 0.24, width: 0.28 } }" />
+
+<SmartCast :line="9" text="found">
+
+```kotlin
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Routing
+import io.ktor.server.routing.get
+import io.ktor.server.util.getValue
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+
+fun Routing.profile(github: GitHubService) {
+  get("/profile") {
+    val user: String by call.queryParameters
+    coroutineScope {
+      val info = async { github.getUserInfo(user) }
+      val repos = async { github.getUserRepos(user) }
+      when (val found = info.await()) {
+        null -> call.respond(HttpStatusCode.NotFound)
+        else -> call.respond(Profile(found, repos.await().orEmpty()))
       }
     }
   }
@@ -120,625 +474,218 @@ fun Application.routes() {
 ```
 
 </SmartCast>
-</TypeHint>
 
 <!--
-`webSocket` is a route like `get`, but its block is a
-`DefaultWebSocketServerSession`: `incoming` and `outgoing` are channels of
-`Frame`, `send` is a shortcut for `outgoing.send(Frame.Text(…))`. The
-`for` loop suspends between frames and ends when the channel closes, so the
-handler returns when the client hangs up. `Frame.Binary` carries bytes,
-`readBytes()`; ping, pong, and close frames are handled by the plug-in
-before they reach us, which is why `else` is empty.
+Nothing in this function imports `io.ktor.client`. The test for it is a
+`testApplication` with an object implementing `GitHubService` from a map;
+the integration test uses `externalServices { hosts("https://api.github.com") { … } }`
+to play GitHub, lesson 8.
 -->
 
 ---
 
-# IntelliJ's HTTP client speaks WebSockets
+# The implementation owns the client
 
-> Any `.http` file in IntelliJ IDEA; the reply appears in the Services tool window
+<DrawnAnnotation text="private val client: HttpClient" label="Built once, shared by every request: connection pool included" :geometry="{ label: { x: 0.4953, y: 0.4184, width: 0.3600 } }" />
 
-<DrawnAnnotation text="WEBSOCKET ws://localhost:8080/greet" label="Not `GET`: the client performs the upgrade and keeps the connection" :geometry="{ label: { x: 0.6368, y: 0.3719, width: 0.4000 } }" />
-<DrawnAnnotation text="=== wait-for-server" label="Each message is one frame; wait for the reply before sending the next" :geometry="{ label: { x: 0.4950, y: 0.5272, width: 0.4000 } }" />
+```kotlin{1}
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
 
-```http
-WEBSOCKET ws://localhost:8080/greet
+class GitHubHttp(private val client: HttpClient) : GitHubService {
+  override suspend fun getUserInfo(user: String): User? {
+    val response = client.get("/users/$user")
+    return if (response.status == HttpStatusCode.OK) response.body<User>()
+    else null
+  }
 
-Alex
-=== wait-for-server
-Kodee
+  override suspend fun getUserRepos(user: String): List<Repo>? =
+    client.get("/users/$user/repos")
+      .takeIf { it.status == HttpStatusCode.OK }
+      ?.body<List<Repo>>()
+}
+```
+
+---
+
+# The implementation owns the client
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
+
+class GitHubHttp(private val client: HttpClient) : GitHubService {
+  override suspend fun getUserInfo(user: String): User? {
+    val response = client.get("/users/$user")
+    return if (response.status == HttpStatusCode.OK) response.body<User>()
+    else null
+  }
+
+  override suspend fun getUserRepos(user: String): List<Repo>? =
+    client.get("/users/$user/repos")
+      .takeIf { it.status == HttpStatusCode.OK }
+      ?.body<List<Repo>>()
+}
+```
+
+---
+
+# Dependencies share the `Application` lifecycle
+
+<DrawnAnnotation text="Application.gitHub" label="An extension on `Application`: an application-scoped dependency" :geometry="{ label: { x: 0.7, y: 0.2, width: 0.36 } }" />
+<DrawnAnnotation text="monitor.subscribe(ApplicationStopped)" label="No more in-flight requests, no running coroutines: close the client" :geometry="{ label: { x: 0.74, y: 0.36, width: 0.4 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopped
+
+fun Application.client(): HttpClient {
+  val client = HttpClient()
+  monitor.subscribe(ApplicationStopped) { client.close() }
+  return client
+}
 ```
 
 <!--
-There are many clients: the browser console with `new WebSocket("ws://…")`,
-`wscat`, Postman. IntelliJ IDEA's HTTP client, despite its name, does
-WebSockets too: the same `.http` files as lesson 2, `WEBSOCKET` instead of
-a method, one message per block. `Hello, Alex` and `Hello, Kodee` come
-back in the response panel.
+The by-hand version first. A dependency that holds a connection pool
+lives as long as the application, so it is an extension on `Application`.
+`monitor` is the application's event bus: `ApplicationStopped` fires
+after the engine stopped accepting requests and every coroutine
+completed, so closing here loses nothing. Same shape for a
+`HikariDataSource`, a Kafka producer, any SDK that batches: flush and
+close on `ApplicationStopped`.
+-->
+
+---
+magic-move
+---
+
+# Wire the graph by hand
+
+<DrawnAnnotation text="class Dependencies" label="The root of the graph: one class, every service the routes need" :geometry="{ label: { x: 0.78, y: 0.48, width: 0.36 } }" />
+<DrawnAnnotation text="profile(dependencies.github)" label="Explicit and typed: maximum control" :geometry="{ label: { x: 0.7207, y: 0.8005, width: 0.3600 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopped
+import io.ktor.server.routing.routing
+
+fun Application.client(): HttpClient {
+  val client = HttpClient()
+  monitor.subscribe(ApplicationStopped) { client.close() }
+  return client
+}
+
+class Dependencies(val github: GitHubService)
+
+fun Application.dependencies(): Dependencies =
+  Dependencies(github = GitHubHttp(client()))
+
+fun Application.module() {
+  val dependencies = dependencies()
+  routing { profile(dependencies.github) }
+}
+```
+
+<!--
+`Dependencies` aggregates the feature modules: here one service, in a
+real service a `PostModule`, a `ProfileModule`, each hiding its own
+infrastructure and exposing services, event handlers, webhook listeners.
+Twenty-five features? Split into Gradle modules, or into services. This
+is manual DI: no framework, nothing resolved by type, the compiler checks
+the graph. The cost is the plumbing, every constructor argument passed by
+hand, every `close()` subscribed by hand. Ktor's DI plug-in does both.
 -->
 
 ---
 
-# JSON frames need a converter
+# The DI plug-in provides the service
 
-<DrawnAnnotation text="Response(val greeting: String)" label="The `@Serializable` classes of lesson 2, one per frame" :geometry="{ label: { x: 0.7620, y: 0.2442, width: 0.2400 } }" />
-<DrawnAnnotation text="contentConverter" label="Not `ContentNegotiation`: a frame has no `Content-Type`, you pick the format" :geometry="{ label: { x: 0.4137, y: 0.5304, width: 0.4400 } }" />
+<DrawnAnnotation text="provide { HttpClient() }" label="Closed on shutdown because it is `AutoCloseable`" on="0"  :geometry="{ label: { x: 0.6105, y: 0.2872 } }"/>
+<DrawnAnnotation text="provide<GitHubService>" label="Registered by its interface: `GitHubHttp` is a detail of `module()`" on="1" :geometry="{ label: { x: 0.4023, y: 0.4192, width: 0.4000 } }" />
 
 ```kotlin
-import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter
+import io.ktor.client.HttpClient
 import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.websocket.WebSockets
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-
-@Serializable data class Request(val name: String)
-@Serializable data class Response(val greeting: String)
+import io.ktor.server.plugins.di.dependencies
+import io.ktor.server.plugins.di.resolve
 
 fun Application.module() {
-  install(WebSockets) {
-    contentConverter = KotlinxWebsocketSerializationConverter(Json)
+  dependencies {
+    provide { HttpClient() }
+    provide<GitHubService> { GitHubHttp(resolve<HttpClient>()) }
+  }
+}
+```
+
+<!--
+`ktor-server-di`, `io.ktor.server.plugins.di.*`. The alternatives were
+on the previous slide, by hand, or a framework such as Koin or Metro. Ktor's own plug-in registers by type, resolves lazily, and
+owns the lifecycle: `AutoCloseable` dependencies are closed in reverse
+order at shutdown, `provide<T> { … } cleanup { it.release() }` for anything
+else. `provide<GitHubService>(::GitHubHttp)` takes a constructor reference
+and resolves its parameters from the registry.
+-->
+
+---
+magic-move
+---
+
+# The DI plug-in provides the service
+
+<DrawnAnnotation text="suspend fun Application.module()" label="Modules may suspend: Ktor starts them in a coroutine" :geometry="{ label: { x: 0.5673, y: 0.2239, width: 0.3600 } }" />
+<DrawnAnnotation text="dependencies.resolve()" label="Suspends until the provider has run: the same registry from another module" :geometry="{ label: { x: 0.5904, y: 0.7060, width: 0.4000 } }" />
+
+```kotlin
+import io.ktor.client.HttpClient
+import io.ktor.server.application.Application
+import io.ktor.server.plugins.di.dependencies
+import io.ktor.server.plugins.di.resolve
+import io.ktor.server.routing.routing
+
+suspend fun Application.module() {
+  dependencies {
+    provide<HttpClient> { HttpClient() }
+    provide<GitHubService> { GitHubHttp(resolve<HttpClient>()) }
   }
   routes()
 }
-```
 
-<!--
-Most message exchanges are JSON. There is no negotiation on a socket: the
-frame is text or binary and nothing says which format is inside, so the
-converter is fixed at install time. `KotlinxWebsocketSerializationConverter`
-comes with `ktor-serialization-kotlinx-json`, the artifact lesson 2 already
-added; the `Json` instance can be the same configured one.
--->
-
----
-
-# Typed frames are read one at a time
-
-<DrawnAnnotation text="receiveDeserialized<Request>()" label="Suspends until the next frame and decodes it; `while (true)` is the loop now" :geometry="{ label: { x: 0.74, y: 0.25, width: 0.4 } }" />
-<DrawnAnnotation text="sendSerialized(" label="Encodes one object into one text frame" :geometry="{ label: { x: 0.74, y: 0.49, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.routing.Route
-import io.ktor.server.websocket.receiveDeserialized
-import io.ktor.server.websocket.sendSerialized
-import io.ktor.server.websocket.webSocket
-
-fun Route.greet() {
-  webSocket("/greet") {
-    while (true) {
-      val req = receiveDeserialized<Request>()
-      sendSerialized(Response("Hello, ${req.name}"))
-    }
-  }
+suspend fun Application.routes() {
+  val github: GitHubService = dependencies.resolve()
+  routing { profile(github) }
 }
 ```
 
 <!--
-`receiveDeserialized` and `sendSerialized` use the converter from the
-plug-in; a frame that does not parse throws `WebsocketDeserializeException`
-with the offending frame attached. The `for` over `incoming` is gone, so
-the loop has to be explicit, and so does its end: the next two slides.
-`routing { greet() }` registers this route.
--->
-
----
-magic-move
----
-
-# Typed frames are read one at a time
-
-<DrawnAnnotation text="ClosedReceiveChannelException" label="The client closed the socket: `incoming` ends and the read throws" :geometry="{ label: { x: 0.72, y: 0.66, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.server.routing.Route
-import io.ktor.server.websocket.receiveDeserialized
-import io.ktor.server.websocket.sendSerialized
-import io.ktor.server.websocket.webSocket
-import kotlinx.coroutines.channels.ClosedReceiveChannelException
-
-fun Route.greet() {
-  webSocket("/greet") {
-    try {
-      while (true) {
-        val req = receiveDeserialized<Request>()
-        sendSerialized(Response("Hello, ${req.name}"))
-      }
-    } catch (e: ClosedReceiveChannelException) {
-      // the client closed the socket
-    }
-  }
-}
-```
-
-<!--
-`incoming` is a `ReceiveChannel`; reading from a closed channel throws
-`ClosedReceiveChannelException`. That is the normal end of a conversation,
-not an error, so the catch is empty: the handler returns and Ktor finishes
-the close handshake.
--->
-
----
-magic-move
----
-
-# Typed frames are read one at a time
-
-<DrawnAnnotation text="CancellationException" label="The server is shutting down: send a close frame with a reason, then let it through" :geometry="{ label: { x: 0.7, y: 0.8, width: 0.44 } }" />
-<DrawnAnnotation text="throw e" />
-
-```kotlin
-import io.ktor.server.routing.Route
-import io.ktor.server.websocket.receiveDeserialized
-import io.ktor.server.websocket.sendSerialized
-import io.ktor.server.websocket.webSocket
-import io.ktor.websocket.CloseReason
-import io.ktor.websocket.close
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.channels.ClosedReceiveChannelException
-
-fun Route.greet() {
-  webSocket("/greet") {
-    try {
-      while (true) {
-        val req = receiveDeserialized<Request>()
-        sendSerialized(Response("Hello, ${req.name}"))
-      }
-    } catch (e: ClosedReceiveChannelException) {
-      // the client closed the socket
-    } catch (e: CancellationException) {
-      close(CloseReason(CloseReason.Codes.GOING_AWAY, "Shutting down"))
-      throw e
-    }
-  }
-}
-```
-
-<!--
-The handler is a coroutine: when the server stops, it is cancelled and the
-suspended `receiveDeserialized` throws `CancellationException`. Catching
-it is the moment to say goodbye properly, `GOING_AWAY` is the code for a
-server leaving; `SERVICE_RESTART` and `NORMAL` exist too. Always rethrow:
-swallowing a `CancellationException` keeps a dead coroutine alive. For a
-guaranteed close frame wrap the `close` in `withContext(NonCancellable)`.
+`resolve()` is the suspending form: it waits for a provider that another
+module registers later, so the order of modules stops mattering. A module
+can also declare its needs as parameters, `fun Application.routes(github:
+GitHubService)`, and Ktor fills them in when it loads the module from
+configuration; lesson 2.
 -->
 
 ---
 
-# Server-Sent Events go one way
-
-> Half a WebSocket: the server pushes, the client listens
-
-<DrawnAnnotation text="install(SSE)" label="`ktor-server-sse`: a `GET` whose response never ends" :geometry="{ label: { x: 0.52, y: 0.352, width: 0.52 } }" />
-<DrawnAnnotation text="sse(&quot;/countdown&quot;)" label="A route like `get`; the block runs until it returns or the client leaves" :geometry="{ label: { x: 0.65, y: 0.446, width: 0.5 } }" />
-<DrawnAnnotation text="send(ServerSentEvent(&quot;$n&quot;))" label="One `data:` line per event; `event`, `id` and `retry` are optional" :geometry="{ label: { x: 0.72, y: 0.54, width: 0.48 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.application.install
-import io.ktor.server.routing.routing
-import io.ktor.server.sse.SSE
-import io.ktor.server.sse.sse
-import io.ktor.sse.ServerSentEvent
-import kotlinx.coroutines.delay
-
-fun Application.module() {
-  install(SSE)
-  routing {
-    sse("/countdown") {
-      for (n in 10 downTo 1) {
-        send(ServerSentEvent("$n"))
-        delay(1000)
-      }
-    }
-  }
-}
-```
-
-<!--
-Progress bars, notifications, a stream of tokens from a model: the
-client has nothing to say back, so a WebSocket is more than it needs.
-Server-Sent Events are a `text/event-stream` response over plain HTTP
-that stays open, one event per block; proxies and load balancers see an
-ordinary request. `heartbeat { }` keeps an idle connection from being
-dropped, `sse(path, serialize = …)` sends `@Serializable` objects as
-JSON, and `ktor-client-sse` is the client side.
--->
-
----
-
-# The stream is plain text
-
-<DrawnAnnotation text="text/event-stream" label="The browser's `EventSource` reads this; the connection stays open" :geometry="{ label: { x: 0.73, y: 0.242, width: 0.46 } }" />
-<DrawnAnnotation text="data: 10" label="One event, ended by a blank line: `onmessage` fires per block" :geometry="{ label: { x: 0.55, y: 0.336, width: 0.5 } }" />
-
-```http
-HTTP/1.1 200 OK
-Content-Type: text/event-stream
-
-data: 10
-
-data: 9
-```
-
-<!--
-`new EventSource("/countdown").onmessage = e => …` in any browser, no
-library. The client reconnects on its own when the connection drops and
-sends `Last-Event-ID` with the `id` of the last event it saw, so a
-server that numbers its events can resume where it left off. `event:`
-names a type that `addEventListener` filters on; `retry:` tells the
-browser how long to wait before reconnecting.
--->
-
----
-
-# OpenAPI describes every endpoint
-
-> One JSON document: every path, parameter, and response; clients, docs, and tests are generated from it
-
-| `get("/greet/{name}")`              | inferred from the routing tree                      |
-|-------------------------------------|-----------------------------------------------------|
-| `call.respond(GreetingResponse(…))` | inferred from the handler: a `200` with that schema |
-| `/** Path: name [String] … */`      | a comment the compiler extension reads              |
-| `.describe { }`                     | attached at runtime; wins over the other two        |
-
-<!--
-OpenAPI, formerly Swagger, is the specification for describing REST
-services; tooling exists in almost every language to generate clients,
-server stubs, and documentation from it. Writing it by hand drifts from
-the code. Ktor 3.5 builds it from the routing tree: what the compiler can
-infer, what a comment adds, and what a `describe` block overrides, merged
-in that order of precedence.
--->
-
----
-
-# The compiler extension reads your routes
-
-<DrawnAnnotation text="id(&quot;io.ktor.plugin&quot;) version &quot;3.6.0&quot;" label="The Gradle plug-in from lesson 1 ships the compiler extension" :geometry="{ label: { x: 0.76, y: 0.242, width: 0.36 } }" />
-<DrawnAnnotation text="codeInferenceEnabled = true" label="Reads `call.parameters`, `call.receive<T>()`, `call.respond(…)` inside handlers" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
-<DrawnAnnotation text="onlyCommented = false" label="Every route is in the document; `true` keeps only the commented ones" :geometry="{ label: { x: 0.74, y: 0.62, width: 0.4 } }" />
-
-```kotlin gradle no-compile
-plugins {
-  id("io.ktor.plugin") version "3.6.0"
-}
-
-ktor {
-  openApi {
-    enabled = true
-    codeInferenceEnabled = true
-    onlyCommented = false
-  }
-}
-```
-
-<!--
-The extension runs at compile time and generates Kotlin that registers
-the metadata at start-up; nothing is inspected by reflection. It needs
-Kotlin 2.4.0 or newer: on an older compiler the Gradle plug-in skips the
-extension with a warning and the document stays empty. `enabled = true`
-adds `ktor-server-routing-openapi`, the runtime metadata API, for you;
-`ktor-server-openapi` and `ktor-server-swagger` serve the document.
-Inference follows extracted handler functions where it can; `// ignore!`
-above a route excludes it when inference gets it wrong.
--->
-
----
-
-# A comment documents the route
-
-<DrawnAnnotation text="Greet a person by name." label="The text before the first keyword is the summary; the extension turns the comment into metadata" :geometry="{ label: { x: 0.72, y: 0.27, width: 0.4 } }" />
-<DrawnAnnotation text="call.parameters[&quot;name&quot;]" label="Inferred: `name` is a path parameter" :geometry="{ label: { x: 0.78, y: 0.4, width: 0.32 } }" />
-<DrawnAnnotation text="call.respond(GreetingResponse(" label="Inferred: a `200` whose schema is `GreetingResponse`" :geometry="{ label: { x: 0.7, y: 0.62, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.response.respond
-import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
-
-fun Route.greeting() {
-  /**
-   * Greet a person by name.
-   */
-  get("/greet/{name}") {
-    val name = call.parameters["name"]
-      ?: return@get call.respond(HttpStatusCode.BadRequest)
-    call.respond(GreetingResponse("Hello, $name"))
-  }
-}
-```
-
-<!--
-A KDoc comment right above the route call. The structure comes from the
-routing DSL: `GET`, `/greet/{name}`; the schema of the response from the
-`call.respond` the compiler sees; the prose from the comment. Nothing on
-this slide is Ktor-specific syntax yet, it is documentation you would have
-written anyway.
--->
-
----
-magic-move
----
-
-# A comment documents the route
-
-<DrawnAnnotation text="Path: name [String] the person to greet" label="Keyword, colon, name, type, description; `Query:`, `Header:`, `Body:` follow the same shape" :geometry="{ label: { x: 0.74, y: 0.385, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.response.respond
-import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
-
-fun Route.greeting() {
-  /**
-   * Greet a person by name.
-   * Path: name [String] the person to greet
-   */
-  get("/greet/{name}") {
-    val name = call.parameters["name"]
-      ?: return@get call.respond(HttpStatusCode.BadRequest)
-    call.respond(GreetingResponse("Hello, $name"))
-  }
-}
-```
-
-<!--
-A keyword at the start of a line, a colon, then the value. `Path`,
-`Query`, `Header`, `Cookie` describe parameters; `Body: application/json
-[Type] description` the request body; `Tag`, `Deprecated`, `Description`,
-`Security`, `ExternalDocs` the rest. Plural forms with bullet lists are
-accepted too: `Responses:` followed by `- 200 …` lines.
--->
-
----
-magic-move
----
-
-# A comment documents the route
-
-<DrawnAnnotation text="Response: 200 [GreetingResponse]" label="Status, then the body type in brackets; the `400` has no body" :geometry="{ label: { x: 0.72, y: 0.5, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.response.respond
-import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
-
-fun Route.greeting() {
-  /**
-   * Greet a person by name.
-   * Path: name [String] the person to greet
-   * Response: 400 The name is missing.
-   * Response: 200 [GreetingResponse] The greeting.
-   */
-  get("/greet/{name}") {
-    val name = call.parameters["name"]
-      ?: return@get call.respond(HttpStatusCode.BadRequest)
-    call.respond(GreetingResponse("Hello, $name"))
-  }
-}
-```
-
-<!--
-`Response: code contentType [Type] description`; the content type is
-optional and defaults to JSON. The `200` schema was already inferred from
-`call.respond`, the comment adds its description; the `400` the compiler
-could not know about, `return@get call.respond(HttpStatusCode.BadRequest)`
-is a status without a body.
--->
-
----
-
-# `describe` documents at runtime
-
-<DrawnAnnotation text="@OptIn(ExperimentalKtorApi::class)" />
-<DrawnAnnotation text=".describe {" label="Runtime beats comments beats inference: the last word on every field" :geometry="{ label: { x: 0.74, y: 0.22, width: 0.4 } }" />
-<DrawnAnnotation text="query(&quot;lang&quot;)" label="Parameters, body, responses: the DSL mirrors the OpenAPI Operation object" :geometry="{ label: { x: 0.74, y: 0.5, width: 0.4 } }" />
-<DrawnAnnotation text="jsonSchema<GreetingResponse>()" label="The schema from the `@Serializable` descriptor; `@JsonSchema.Description` refines it" :geometry="{ label: { x: 0.72, y: 0.76, width: 0.44 } }" />
-
-```kotlin
-import io.ktor.http.HttpStatusCode
-import io.ktor.openapi.jsonSchema
-import io.ktor.server.routing.Route
-import io.ktor.server.routing.get
-import io.ktor.server.routing.openapi.describe
-import io.ktor.utils.io.ExperimentalKtorApi
-
-@OptIn(ExperimentalKtorApi::class)
-fun Route.greeting(): Route =
-  get("/greet/{name}") { greet() }.describe {
-    summary = "Greet a person by name"
-    parameters {
-      query("lang") { description = "Language of the greeting" }
-    }
-    responses {
-      HttpStatusCode.OK {
-        description = "The greeting"
-        schema = jsonSchema<GreetingResponse>()
-      }
-    }
-  }
-```
-
-<!--
-`ktor-server-routing-openapi`, `io.ktor.server.routing.openapi.describe`,
-experimental in 3.5 so it needs the opt-in. `describe` returns the route,
-so it chains after `get`; it is the tool for what the compiler cannot see:
-routes built in a loop, interceptors, conditions. The same field set by
-several sources resolves to the runtime value; fields nobody overrides
-are kept and merged. Schemas come from the kotlinx.serialization
-descriptor by default; `ReflectionJsonSchemaInference` exists for Jackson
-and Gson models.
--->
-
----
-
-# Two routes serve the document
-
-<DrawnAnnotation text="openAPI(&quot;/openapi&quot;)" label="`ktor-server-openapi`: HTML documentation rendered from the document at start-up" :geometry="{ label: { x: 0.74, y: 0.25, width: 0.4 } }" />
-<DrawnAnnotation text="OpenApiDocSource.Routing(" label="Assembled from the routing tree: inference, comments, and `describe` merged" :geometry="{ label: { x: 0.7, y: 0.5, width: 0.44 } }" />
-
-```kotlin
-import io.ktor.http.ContentType
-import io.ktor.openapi.OpenApiInfo
-import io.ktor.server.application.Application
-import io.ktor.server.plugins.openapi.openAPI
-import io.ktor.server.routing.openapi.OpenApiDocSource
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    openAPI("/openapi") {
-      info = OpenApiInfo("Greeting API", "1.0.0")
-      source = OpenApiDocSource.Routing(ContentType.Application.Json)
-    }
-  }
-}
-```
-
-<!--
-`info` is what the compiler cannot know: title, version, servers,
-security schemes. The default `source` looks for
-`openapi/documentation.yaml` in the resources first and falls back to the
-routing tree, so a hand-written specification still works. `openAPI` runs
-`swagger-codegen` at start-up and serves the static HTML it produced;
-the documented routes are registered in this same `routing` block.
-Since 3.5.2 it warns at start-up that `swagger-codegen` only officially
-supports OpenAPI 3.0.x while the routing source emits 3.1.1: the HTML
-may be incomplete, Swagger UI is the one to rely on.
--->
-
----
-magic-move
----
-
-# Two routes serve the document
-
-<DrawnAnnotation text="swaggerUI(&quot;/swagger&quot;)" label="`ktor-server-swagger`: the document as JSON at `/swagger/openapi.json`, plus the UI that reads it" :geometry="{ label: { x: 0.74, y: 0.48, width: 0.4 } }" />
-
-```kotlin
-import io.ktor.http.ContentType
-import io.ktor.openapi.OpenApiInfo
-import io.ktor.server.application.Application
-import io.ktor.server.plugins.openapi.openAPI
-import io.ktor.server.plugins.swagger.swaggerUI
-import io.ktor.server.routing.openapi.OpenApiDocSource
-import io.ktor.server.routing.routing
-
-fun Application.routes() {
-  routing {
-    openAPI("/openapi") {
-      info = OpenApiInfo("Greeting API", "1.0.0")
-      source = OpenApiDocSource.Routing(ContentType.Application.Json)
-    }
-    swaggerUI("/swagger") {
-      info = OpenApiInfo("Greeting API", "1.0.0")
-      source = OpenApiDocSource.Routing(ContentType.Application.Json)
-      remotePath = "openapi.json"
-    }
-  }
-}
-```
-
-<!--
-Swagger UI is the interactive one: try a route from the browser, see the
-schemas. It serves the document itself under `remotePath`, which
-defaults to `documentation.yaml` whatever the content type, so name it
-`openapi.json` when the source is JSON. Both
-plug-ins hide their own routes from the document.
--->
-
----
-magic-move
----
-
-# Two routes serve the document
-
-<DrawnAnnotation text=".hide()" label="Kept out of the document; the two plug-ins hide their own routes the same way" :geometry="{ label: { x: 0.7, y: 0.82, width: 0.44 } }" />
-
-```kotlin
-import io.ktor.http.ContentType
-import io.ktor.openapi.OpenApiInfo
-import io.ktor.server.application.Application
-import io.ktor.server.plugins.openapi.openAPI
-import io.ktor.server.plugins.swagger.swaggerUI
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.get
-import io.ktor.server.routing.openapi.OpenApiDocSource
-import io.ktor.server.routing.openapi.hide
-import io.ktor.server.routing.routing
-import io.ktor.utils.io.ExperimentalKtorApi
-
-@OptIn(ExperimentalKtorApi::class)
-fun Application.routes() {
-  routing {
-    openAPI("/openapi") {
-      info = OpenApiInfo("Greeting API", "1.0.0")
-      source = OpenApiDocSource.Routing(ContentType.Application.Json)
-    }
-    swaggerUI("/swagger") {
-      info = OpenApiInfo("Greeting API", "1.0.0")
-      source = OpenApiDocSource.Routing(ContentType.Application.Json)
-      remotePath = "openapi.json"
-    }
-    get("/health") { call.respondText("ok") }.hide()
-  }
-}
-```
-
-<!--
-Health checks, admin endpoints, metrics: public in the server, absent
-from the published API. `hide` on a `route { }` hides its whole subtree.
--->
-
----
-
-# The document is JSON
-
-<DrawnAnnotation text="GET /swagger/openapi.json" label="The same document Swagger UI renders; `/openapi` is the HTML version" :geometry="{ label: { x: 0.74, y: 0.2, width: 0.4 } }" />
-<DrawnAnnotation text="&quot;/greet/{name}&quot;" label="Every route, with what inference, the comment, and `describe` said about it" :geometry="{ label: { x: 0.7, y: 0.77, width: 0.44 } }" />
-
-```http
-GET /swagger/openapi.json HTTP/1.1
-Host: localhost:8080
-
-HTTP/1.1 200 OK
-Content-Type: application/json
-
-{
-  "openapi": "3.1.1",
-  "info": { "title": "Greeting API", "version": "1.0.0" },
-  "paths": {
-    "/greet/{name}": { "get": { "summary": "Greet a person by name" } }
-  }
-}
-```
-
-<!--
-Trimmed: the real `get` object carries `parameters`, `responses` with
-their schemas under `components`, tags, and whatever else was described.
-OpenAPI is huge, every element can have a description, summary, example;
-the `describe` DSL exposes all of it, the comment keywords the common
-part. Feed this URL to any OpenAPI generator and you have a client.
--->
-
----
-
-# Two-way messages, described APIs
-
-- `webSocket("/greet") { incoming }` → one connection, many frames
-- `receiveDeserialized<T>()`, `sendSerialized(…)` → typed frames
-- `ClosedReceiveChannelException` → the client left; `close(…)` to leave
-- `sse("/…") { send(ServerSentEvent(…)) }` → one way, plain HTTP, `EventSource`
-- `/** Path: … Response: … */` → the compiler extension reads comments
-- `.describe { }`, `.hide()`, `swaggerUI` → the last word; two routes publish it
-
-> **The specification is the routing tree, written down.**
+# One framework on both ends of the wire
+
+- `HttpClient(CIO) { install(…) }` → the server's plug-ins, another package
+- `@Serializable` → the schema, shared in one module when both ends are yours
+- `client.get("/users/$user")`, `body<T>()` → a verb, a URL, a typed response
+- `coroutineScope { async { } }`, `awaitAll` → concurrent, not by accident
+- `withContext(Dispatchers.IO)`, `HttpTimeout` → blocking off the engine, waiting with a limit
+- `monitor.subscribe(ApplicationStopped)` → close what the application opened
+- `interface`, `AutoCloseable`, `by dependencies` → hidden, closed, provided
+
+> **Suspend all the way down.**
 >
-> Inference, then comments, then `describe`.
+> The handler, the client, the service: one coroutine.
 
 ---
 layout: intro
@@ -748,9 +695,10 @@ kodee: heart
 
 <div class="lesson-number">Exercise</div>
 
-# Echo JSON and publish the spec
+# Call another API from a route
 
-- Add a `/chat` WebSocket route that echoes a `@Serializable` message with a timestamp
-- Talk to it from an `.http` file with `WEBSOCKET ws://localhost:8080/chat`
-- Enable the OpenAPI extension and document the greeting routes with KDoc
-- Serve Swagger UI at `/swagger`, `.hide()` the health check, and call a route from the browser
+- Pick a public JSON API and model two of its responses as `@Serializable` DTOs
+- Build one `HttpClient` with `ContentNegotiation`, `defaultRequest`, and `HttpRequestRetry`
+- Answer `/profile/{name}` by fetching both URLs concurrently with `async` and `awaitAll`
+- Hide the client behind an interface, implement it as `AutoCloseable`, provide it with `ktor-server-di`
+- Swap in a fake implementation and check the route still answers
