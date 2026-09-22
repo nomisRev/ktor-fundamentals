@@ -5,12 +5,17 @@ package presentation.snippets.lesson4.slide88
 
 import presentation.support.*
 import io.ktor.server.application.Application
+import io.ktor.server.http.content.CompressedFileType
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.routing.routing
 import java.io.File
 
 fun Application.module() {
   routing {
-    staticFiles("/assets", File("files"))
+    staticFiles("/assets", File("files")) {
+      default("index.html")
+      preCompressed(CompressedFileType.GZIP)
+      exclude { file -> file.name.startsWith(".") }
+    }
   }
 }

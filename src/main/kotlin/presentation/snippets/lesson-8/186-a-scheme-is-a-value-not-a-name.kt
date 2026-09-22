@@ -9,11 +9,4 @@ import io.ktor.server.auth.basic
 
 val basicAuth = basic<UserIdPrincipal>("auth") {
   realm = "Access to secrets"
-  validate { credentials ->
-    if (credentials.password == "supersecret") {
-      UserIdPrincipal(credentials.name)
-    } else {
-      null
-    }
-  }
 }

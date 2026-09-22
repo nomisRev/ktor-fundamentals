@@ -7,22 +7,16 @@ import presentation.support.*
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
-import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.statuspages.StatusPages
-import kotlinx.html.body
-import kotlinx.html.h1
-import kotlinx.html.p
+import io.ktor.server.plugins.statuspages.statusFile
 
 fun Application.module() {
   install(StatusPages) {
-    exception<Throwable> { call, cause ->
-      call.respondHtml(HttpStatusCode.InternalServerError) {
-        body {
-          h1 { +"This is embarrassing" }
-          cause.message?.let { p { +it } }
-        }
-      }
-    }
+    statusFile(
+      HttpStatusCode.Unauthorized,
+      HttpStatusCode.NotFound,
+      filePattern = "static/error/#.html",
+    )
   }
   routes()
 }

@@ -33,6 +33,7 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.Routing
 import io.ktor.server.routing.RoutingContext
 import io.ktor.server.routing.get
 import io.ktor.server.routing.route
@@ -115,6 +116,14 @@ suspend fun RoutingContext.github(github: GitHubService, user: String) {
   val info = github.getUserInfo(user)
   if (info == null) call.respond(HttpStatusCode.NotFound)
   else call.respond(Profile(info, github.getUserRepos(user).orEmpty()))
+}
+
+/** The route the DI slides register: `Routing.profile` from "Handlers depend on the service". */
+fun Routing.profile(github: GitHubService) {
+  get("/profile") {
+    val user: String by call.queryParameters
+    github(github, user)
+  }
 }
 
 // ---------------------------------------------------------------------------

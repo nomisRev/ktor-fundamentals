@@ -5,8 +5,9 @@ package presentation.snippets.lesson9.slide238
 
 import presentation.support.*
 import io.ktor.server.application.Application
-import io.ktor.server.plugins.di.annotations.Property
 
-fun Application.module(@Property("github.token") token: String) {
+fun Application.module() {
+  val token = environment.config.property("github.token").getString()
+  val name = environment.config.propertyOrNull("app.name")?.getString()
   routes()
 }

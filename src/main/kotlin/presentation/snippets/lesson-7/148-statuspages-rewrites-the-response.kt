@@ -7,16 +7,18 @@ import presentation.support.*
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.statuspages.StatusPages
-import io.ktor.server.plugins.statuspages.statusFile
+import kotlinx.html.body
+import kotlinx.html.h1
 
 fun Application.module() {
   install(StatusPages) {
-    statusFile(
-      HttpStatusCode.Unauthorized,
-      HttpStatusCode.NotFound,
-      filePattern = "static/error/#.html",
-    )
+    status(HttpStatusCode.NotFound) { call, status ->
+      call.respondHtml(status) {
+        body { h1 { +"Keep looking somewhere else" } }
+      }
+    }
   }
   routes()
 }

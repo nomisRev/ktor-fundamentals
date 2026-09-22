@@ -6,7 +6,7 @@ package presentation.snippets.lesson8.slide189
 import presentation.support.*
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.UserPasswordCredential
-import io.ktor.server.auth.ldap.ldapAuthenticate
 
 fun checkCredentials(credentials: UserPasswordCredential): UserIdPrincipal? =
-  ldapAuthenticate(credentials, "ldap://localhost:389", "cn=%s,dc=example")
+  if (credentials.password == "supersecret") UserIdPrincipal(credentials.name)
+  else null

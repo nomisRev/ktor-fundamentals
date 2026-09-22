@@ -10,7 +10,6 @@ import com.sksamuel.hoplite.addResourceSource
 data class Config(val name: String, val version: String)
 
 val config: Config = ConfigLoaderBuilder.default()
-  .addResourceSource("/prod.conf")
   .addResourceSource("/defaults.conf")
   .build()
   .loadConfigOrThrow<Config>()

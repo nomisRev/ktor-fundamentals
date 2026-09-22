@@ -13,7 +13,6 @@ fun appTest(test: suspend (HttpClient) -> Unit) = testApplication {
   application { module() }
   val client = createClient {
     install(ContentNegotiation) { json() }
-    expectSuccess = true
   }
   test(client)
 }

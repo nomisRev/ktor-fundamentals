@@ -5,8 +5,6 @@ package presentation.snippets.lesson7.slide168
 
 import presentation.support.*
 import io.kotest.matchers.shouldBe
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -26,10 +24,6 @@ fun profile() = testApplication {
       routing { get("/users/{u}") { call.respond(User("Alex", null, null)) } }
     }
   }
-  val github = createClient {
-    install(ContentNegotiation) { json() }
-    defaultRequest { url("https://api.github.com") }
-  }
-  application { module(GitHubHttp(github)) }
+  application { module(GitHubHttp(client())) }
   client.get("/github/alex").status shouldBe HttpStatusCode.OK
 }

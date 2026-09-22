@@ -8,6 +8,5 @@ import io.ktor.server.application.Application
 
 fun Application.module() {
   val token = environment.config.property("github.token").getString()
-  val name = environment.config.propertyOrNull("app.name")?.getString()
   routes()
 }

@@ -3,27 +3,17 @@
 
 package presentation.snippets.lesson5.slide118
 
+import io.ktor.client.HttpClient
 import presentation.support.*
 import io.ktor.server.application.Application
 import io.ktor.server.plugins.di.dependencies
-import io.ktor.server.plugins.di.resolve
-import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
-import io.ktor.server.util.getValue
 
-suspend fun Application.module() {
+fun Application.module() {
   dependencies {
-    provide<GitHubService> { GitHubHttp(client()) }
+    provide { HttpClient() }
+    provide<GitHubService> { GitHubHttp(resolve<HttpClient>()) }
   }
-  routes()
-}
-
-suspend fun Application.routes() {
-  val github: GitHubService = dependencies.resolve()
-  routing {
-    get("/github/{username}") {
-      val username: String by call.pathParameters
-      github(github, username)
-    }
-  }
+  val github: GitHubService by dependencies
+  routing { profile(github) }
 }

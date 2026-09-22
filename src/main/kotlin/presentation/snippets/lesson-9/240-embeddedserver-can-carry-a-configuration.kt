@@ -4,8 +4,7 @@
 package presentation.snippets.lesson9.slide240
 
 import presentation.support.*
-import com.typesafe.config.ConfigFactory
-import io.ktor.server.config.HoconApplicationConfig
+import io.ktor.server.config.MapApplicationConfig
 import io.ktor.server.engine.applicationEnvironment
 import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
@@ -15,7 +14,7 @@ fun main() {
   embeddedServer(
     Netty,
     environment = applicationEnvironment {
-      config = HoconApplicationConfig(ConfigFactory.load())
+      config = MapApplicationConfig("app.name" to "Awesome Ktor app")
     },
     configure = { connector { port = 8080 } },
   ) { module() }.start(wait = true)

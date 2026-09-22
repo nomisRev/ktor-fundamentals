@@ -8,7 +8,6 @@ import io.ktor.http.ContentType
 import io.ktor.openapi.OpenApiInfo
 import io.ktor.server.application.Application
 import io.ktor.server.plugins.openapi.openAPI
-import io.ktor.server.plugins.swagger.swaggerUI
 import io.ktor.server.routing.openapi.OpenApiDocSource
 import io.ktor.server.routing.routing
 
@@ -17,11 +16,6 @@ fun Application.routes() {
     openAPI("/openapi") {
       info = OpenApiInfo("Greeting API", "1.0.0")
       source = OpenApiDocSource.Routing(ContentType.Application.Json)
-    }
-    swaggerUI("/swagger") {
-      info = OpenApiInfo("Greeting API", "1.0.0")
-      source = OpenApiDocSource.Routing(ContentType.Application.Json)
-      remotePath = "openapi.json"
     }
   }
 }

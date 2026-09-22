@@ -36,7 +36,7 @@ and the close are handled by Ktor; the frames in between are ours.
 
 # WebSockets are a plug-in
 
-<DrawnAnnotation text="install(WebSockets)" label="`ktor-server-websockets`; the client has a plug-in of its own" :geometry="{ label: { x: 0.7, y: 0.242, width: 0.4 } }" />
+<DrawnAnnotation text="install(WebSockets)" label="`ktor-server-websockets`; the client has a plug-in of its own" :geometry="{ label: { x: 0.4593, y: 0.2744, width: 0.4000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -60,8 +60,8 @@ plug-in on the client, `io.ktor.client.plugins.websocket.WebSockets`.
 
 # A handler loops over `incoming`
 
-<DrawnAnnotation text="webSocket(&quot;/greet&quot;)" label="A `GET /greet` that upgrades: the block runs for the whole connection" :geometry="{ label: { x: 0.72, y: 0.29, width: 0.4 } }" />
-<DrawnAnnotation text="for (frame in incoming)" label="`incoming` is a channel of frames; the loop ends when the socket closes" :geometry="{ label: { x: 0.74, y: 0.4, width: 0.4 } }" />
+<DrawnAnnotation text="webSocket(&quot;/greet&quot;)" label="A `GET /greet` that upgrades: the block runs for the whole connection" on="0" :geometry="{ label: { x: 0.5927, y: 0.3037, width: 0.4000 } }" />
+<DrawnAnnotation text="for (frame in incoming)" label="`incoming` is a channel of frames; the loop ends when the socket closes" on="1" :geometry="{ label: { x: 0.5650, y: 0.3744, width: 0.4000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -91,8 +91,8 @@ magic-move
 
 # A handler loops over `incoming`
 
-<DrawnAnnotation text="is Frame.Text" label="Frames are types: text here; binary, ping, and close take other branches" :geometry="{ label: { x: 0.74, y: 0.62, width: 0.42 } }" />
-<DrawnAnnotation text="send(" label="`send` writes one text frame to `outgoing`" :geometry="{ label: { x: 0.74, y: 0.72, width: 0.36 } }" />
+<DrawnAnnotation text="is Frame.Text" label="Frames are types: text here; binary, ping, and close take other branches" on="0" :geometry="{ label: { x: 0.4963, y: 0.5142, width: 0.4200 } }" />
+<DrawnAnnotation text="send(" label="`send` writes one text frame to `outgoing`" on="1" :geometry="{ label: { x: 0.4746, y: 0.5153, width: 0.3600 } }" />
 
 <TypeHint :line="3" receiver="DefaultWebSocketServerSession">
 <SmartCast :line="6" text="frame">
@@ -138,8 +138,8 @@ before they reach us, which is why `else` is empty.
 
 > Any `.http` file in IntelliJ IDEA; the reply appears in the Services tool window
 
-<DrawnAnnotation text="WEBSOCKET ws://localhost:8080/greet" label="Not `GET`: the client performs the upgrade and keeps the connection" :geometry="{ label: { x: 0.74, y: 0.37, width: 0.4 } }" />
-<DrawnAnnotation text="=== wait-for-server" label="Each message is one frame; wait for the reply before sending the next" :geometry="{ label: { x: 0.72, y: 0.5, width: 0.4 } }" />
+<DrawnAnnotation text="WEBSOCKET ws://localhost:8080/greet" label="Not `GET`: the client performs the upgrade and keeps the connection" :geometry="{ label: { x: 0.6368, y: 0.3719, width: 0.4000 } }" />
+<DrawnAnnotation text="=== wait-for-server" label="Each message is one frame; wait for the reply before sending the next" :geometry="{ label: { x: 0.4950, y: 0.5272, width: 0.4000 } }" />
 
 ```http
 WEBSOCKET ws://localhost:8080/greet
@@ -161,8 +161,8 @@ back in the response panel.
 
 # JSON frames need a converter
 
-<DrawnAnnotation text="Response(val greeting: String)" label="The `@Serializable` classes of lesson 2, one per frame" :geometry="{ label: { x: 0.82, y: 0.31, width: 0.24 } }" />
-<DrawnAnnotation text="contentConverter" label="Not `ContentNegotiation`: a frame has no `Content-Type`, you pick the format" :geometry="{ label: { x: 0.7, y: 0.66, width: 0.44 } }" />
+<DrawnAnnotation text="Response(val greeting: String)" label="The `@Serializable` classes of lesson 2, one per frame" :geometry="{ label: { x: 0.7620, y: 0.2442, width: 0.2400 } }" />
+<DrawnAnnotation text="contentConverter" label="Not `ContentNegotiation`: a frame has no `Content-Type`, you pick the format" :geometry="{ label: { x: 0.4137, y: 0.5304, width: 0.4400 } }" />
 
 ```kotlin
 import io.ktor.serialization.kotlinx.KotlinxWebsocketSerializationConverter

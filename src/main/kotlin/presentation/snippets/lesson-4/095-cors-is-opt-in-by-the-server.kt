@@ -15,6 +15,9 @@ fun Application.module() {
       schemes = listOf("https"),
       subDomains = listOf("www", "app"),
     )
+    allowCredentials = true
+    allowNonSimpleContentTypes = true
+    allowHeadersPrefixed("X-Greet-")
   }
   routes()
 }

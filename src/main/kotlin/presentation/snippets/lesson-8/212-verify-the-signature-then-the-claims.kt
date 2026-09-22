@@ -6,10 +6,8 @@ package presentation.snippets.lesson8.slide212
 import presentation.support.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.jwt.jwt
-import io.ktor.server.response.respond
 
 val jwtAuth = jwt<UserIdPrincipal>("auth-jwt") {
   realm = "Access to secrets"
@@ -17,8 +15,5 @@ val jwtAuth = jwt<UserIdPrincipal>("auth-jwt") {
   validate { credential ->
     val user = credential.payload.getClaim("username").asString()
     if (user.isNullOrEmpty()) null else UserIdPrincipal(user)
-  }
-  onUnauthorized = { cause ->
-    call.respond(HttpStatusCode.Unauthorized, "Token invalid or expired")
   }
 }

@@ -5,7 +5,6 @@ package presentation.snippets.lesson8.slide198
 
 import presentation.support.*
 import io.ktor.server.auth.session
-import io.ktor.server.response.respondRedirect
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -13,5 +12,4 @@ data class UserInfo(val name: String, val timezone: String)
 
 val sessionAuth = session<UserInfo, UserInfo>("auth-session") {
   validate { it }
-  onUnauthorized = { call.respondRedirect("/login") }
 }

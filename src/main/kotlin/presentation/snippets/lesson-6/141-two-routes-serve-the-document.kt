@@ -9,14 +9,9 @@ import io.ktor.openapi.OpenApiInfo
 import io.ktor.server.application.Application
 import io.ktor.server.plugins.openapi.openAPI
 import io.ktor.server.plugins.swagger.swaggerUI
-import io.ktor.server.response.respondText
-import io.ktor.server.routing.get
 import io.ktor.server.routing.openapi.OpenApiDocSource
-import io.ktor.server.routing.openapi.hide
 import io.ktor.server.routing.routing
-import io.ktor.utils.io.ExperimentalKtorApi
 
-@OptIn(ExperimentalKtorApi::class)
 fun Application.routes() {
   routing {
     openAPI("/openapi") {
@@ -28,6 +23,5 @@ fun Application.routes() {
       source = OpenApiDocSource.Routing(ContentType.Application.Json)
       remotePath = "openapi.json"
     }
-    get("/health") { call.respondText("ok") }.hide()
   }
 }

@@ -15,7 +15,6 @@ fun Application.routes() {
     post("/login") {
       if (loggedIn) {
         val token = JWT.create()
-          .withClaim("username", name)
           .sign(Algorithm.HMAC256(secret))
       }
     }

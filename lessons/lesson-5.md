@@ -448,20 +448,22 @@ interface GitHubService {
 
 # Handlers depend on the service
 
-<DrawnAnnotation text="github: GitHubService" label="A fake in tests, `GitHubHttp` in `module()`: the handler cannot tell" :geometry="{ label: { x: 0.6417, y: 0.2439, width: 0.2800 } }" />
+<DrawnAnnotation text="github: GitHubService" label="A fake in tests, `GitHubHttp` in `module()`: the handler cannot tell" :geometry="{ label: { x: 0.8, y: 0.24, width: 0.28 } }" />
 
-<SmartCast :line="7" text="found">
+<SmartCast :line="9" text="found">
 
 ```kotlin
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
-import io.ktor.server.routing.RoutingContext
+import io.ktor.server.routing.Routing
+import io.ktor.server.routing.get
+import io.ktor.server.util.getValue
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
 fun Routing.profile(github: GitHubService) {
-  get("/profile") { 
-    val name: String by call.parameters
+  get("/profile") {
+    val user: String by call.queryParameters
     coroutineScope {
       val info = async { github.getUserInfo(user) }
       val repos = async { github.getUserRepos(user) }
@@ -487,9 +489,31 @@ to play GitHub, lesson 7.
 
 # The implementation owns the client
 
-<DrawnAnnotation text="private val client: HttpClient" label="Built once, shared by every request: connection pool included" :geometry="{ label: { x: 0.74, y: 0.25, width: 0.36 } }" />
-<DrawnAnnotation text="AutoCloseable" label="Whoever creates it closes it" :geometry="{ label: { x: 0.8, y: 0.4, width: 0.28 } }" />
-<DrawnAnnotation text="client.close()" label="`close` releases the pool: once, not per request" :geometry="{ label: { x: 0.76, y: 0.81, width: 0.36 } }" />
+<DrawnAnnotation text="private val client: HttpClient" label="Built once, shared by every request: connection pool included" :geometry="{ label: { x: 0.4953, y: 0.4184, width: 0.3600 } }" />
+
+```kotlin{1}
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
+
+class GitHubHttp(private val client: HttpClient) : GitHubService {
+  override suspend fun getUserInfo(user: String): User? {
+    val response = client.get("/users/$user")
+    if (response.status == HttpStatusCode.OK) response.body<User>()
+    else null 
+  }
+
+  override suspend fun getUserRepos(user: String): List<Repo>? =
+    client.get("/users/$user/repos")
+      .takeIf { it.status == HttpStatusCode.OK }
+      ?.body<List<Repo>>()
+}
+```
+
+---
+
+# The implementation owns the client
 
 ```kotlin
 import io.ktor.client.HttpClient
@@ -497,37 +521,95 @@ import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 
-class GitHubHttp(
-  private val client: HttpClient,
-) : GitHubService, AutoCloseable {
-  override suspend fun getUserInfo(user: String): User? =
-    client.get("/users/$user")
-      .takeIf { it.status == HttpStatusCode.OK }
-      ?.body<User>()
+class GitHubHttp(private val client: HttpClient) : GitHubService {
+  override suspend fun getUserInfo(user: String): User? {
+    val response = client.get("/users/$user")
+    if (response.status == HttpStatusCode.OK) response.body<User>()
+    else null 
+  }
 
   override suspend fun getUserRepos(user: String): List<Repo>? =
     client.get("/users/$user/repos")
       .takeIf { it.status == HttpStatusCode.OK }
       ?.body<List<Repo>>()
+}
+```
 
-  override fun close() = client.close()
+---
+
+# Dependencies share the `Application` lifecycle
+
+<DrawnAnnotation text="Application.gitHub" label="An extension on `Application`: an application-scoped dependency" :geometry="{ label: { x: 0.7, y: 0.2, width: 0.36 } }" />
+<DrawnAnnotation text="monitor.subscribe(ApplicationStopped)" label="No more in-flight requests, no running coroutines: close the client" :geometry="{ label: { x: 0.74, y: 0.36, width: 0.4 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopped
+
+fun Application.client(): HttpClient {
+  val client = HttpClient()
+  monitor.subscribe(ApplicationStopped) { client.close() }
+  return client
 }
 ```
 
 <!--
-Most services need to be initialised and closed: a connection pool, a
-database, a file. `AutoCloseable` is the one requirement, and `use { }`
-still works for a scoped instance: `GitHubHttp(client()).use { github ->
-routing { … } }`. For the lifetime of the application there is a better
-place to put that.
+The by-hand version first. A dependency that holds a connection pool
+lives as long as the application, so it is an extension on `Application`.
+`monitor` is the application's event bus: `ApplicationStopped` fires
+after the engine stopped accepting requests and every coroutine
+completed, so closing here loses nothing. Same shape for a
+`HikariDataSource`, a Kafka producer, any SDK that batches: flush and
+close on `ApplicationStopped`.
+-->
+
+---
+magic-move
+---
+
+# Wire the graph by hand
+
+<DrawnAnnotation text="class Dependencies" label="The root of the graph: one class, every service the routes need" :geometry="{ label: { x: 0.78, y: 0.48, width: 0.36 } }" />
+<DrawnAnnotation text="profile(dependencies.github)" label="Explicit and typed: maximum control" :geometry="{ label: { x: 0.7207, y: 0.8005, width: 0.3600 } }" />
+
+```kotlin
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationStopped
+import io.ktor.server.routing.routing
+
+fun Application.client(): HttpClient {
+  val client = HttpClient()
+  monitor.subscribe(ApplicationStopped) { client.close() }
+  return client
+}
+
+class Dependencies(val github: GitHubService)
+
+fun Application.dependencies(): Dependencies =
+  Dependencies(github = GitHubService(client()))
+
+fun Application.module() {
+  val dependencies = dependencies()
+  routing { profile(dependencies.github) }
+}
+```
+
+<!--
+`Dependencies` aggregates the feature modules: here one service, in a
+real service a `PostModule`, a `ProfileModule`, each hiding its own
+infrastructure and exposing services, event handlers, webhook listeners.
+Twenty-five features? Split into Gradle modules, or into services. This
+is manual DI: no framework, nothing resolved by type, the compiler checks
+the graph. The cost is the plumbing, every constructor argument passed by
+hand, every `close()` subscribed by hand. Ktor's DI plug-in does both.
 -->
 
 ---
 
 # The DI plug-in provides the service
 
-<DrawnAnnotation text="provide<GitHubService>" label="Registered by its interface: `GitHubHttp` is a detail of `module()`" :geometry="{ label: { x: 0.74, y: 0.35, width: 0.4 } }" />
-<DrawnAnnotation text="GitHubHttp(client())" label="Closed on shutdown because it is `AutoCloseable`" :geometry="{ label: { x: 0.74, y: 0.46, width: 0.36 } }" />
+<DrawnAnnotation text="provide { HttpClient() }" label="Closed on shutdown because it is `AutoCloseable`" on="0"  :geometry="{ label: { x: 0.6105, y: 0.2872 } }"/>
+<DrawnAnnotation text="provide<GitHubService>" label="Registered by its interface: `GitHubHttp` is a detail of `module()`" on="1" :geometry="{ label: { x: 0.4023, y: 0.4192, width: 0.4000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
@@ -535,16 +617,15 @@ import io.ktor.server.plugins.di.dependencies
 
 fun Application.module() {
   dependencies {
-    provide<GitHubService> { GitHubHttp(client()) }
+    provide { HttpClient() }
+    provide<GitHubService> { GitHubHttp(resolve<HttpClient>()) }
   }
-  routes()
 }
 ```
 
 <!--
-`ktor-server-di`, `io.ktor.server.plugins.di.*`. Alternatives: pass
-everything by hand, maximum control and maximum plumbing; or a framework
-such as Koin. Ktor's own plug-in registers by type, resolves lazily, and
+`ktor-server-di`, `io.ktor.server.plugins.di.*`. The alternatives were
+on the previous slide, by hand, or a framework such as Koin or Metro. Ktor's own plug-in registers by type, resolves lazily, and
 owns the lifecycle: `AutoCloseable` dependencies are closed in reverse
 order at shutdown, `provide<T> { … } cleanup { it.release() }` for anything
 else. `provide<GitHubService>(::GitHubHttp)` takes a constructor reference
@@ -557,70 +638,26 @@ magic-move
 
 # The DI plug-in provides the service
 
-<DrawnAnnotation text="by dependencies" label="Resolved at start-up: a missing provider fails the boot, not the first request" :geometry="{ label: { x: 0.74, y: 0.39, width: 0.4 } }" />
-<DrawnAnnotation text="github(github, username)" label="The handler from before, now with a real service" :geometry="{ label: { x: 0.76, y: 0.54, width: 0.36 } }" />
-
-```kotlin
-import io.ktor.server.application.Application
-import io.ktor.server.plugins.di.dependencies
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
-import io.ktor.server.util.getValue
-
-fun Application.module() {
-  dependencies {
-    provide<GitHubService> { GitHubHttp(client()) }
-  }
-  val github: GitHubService by dependencies
-  routing {
-    get("/github/{username}") {
-      val username: String by call.pathParameters
-      github(github, username)
-    }
-  }
-}
-```
-
-<!--
-Property delegation is the non-suspending form: the registry checks at
-start-up that every required type has a provider, and the value is fetched
-on first access. Names disambiguate several implementations of one
-interface: `provide<GitHubService>("cached") { … }` and
-`val github: GitHubService by dependencies.named("cached")`.
--->
-
----
-magic-move
----
-
-# The DI plug-in provides the service
-
-<DrawnAnnotation text="suspend fun Application.module()" label="Modules may suspend: Ktor starts them in a coroutine" :geometry="{ label: { x: 0.76, y: 0.2, width: 0.36 } }" />
-<DrawnAnnotation text="dependencies.resolve()" label="Suspends until the provider has run: the same registry from another module" :geometry="{ label: { x: 0.7721, y: 0.6604, width: 0.4000 } }" />
+<DrawnAnnotation text="suspend fun Application.module()" label="Modules may suspend: Ktor starts them in a coroutine" :geometry="{ label: { x: 0.5673, y: 0.2239, width: 0.3600 } }" />
+<DrawnAnnotation text="dependencies.resolve()" label="Suspends until the provider has run: the same registry from another module" :geometry="{ label: { x: 0.5904, y: 0.7060, width: 0.4000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
 import io.ktor.server.plugins.di.dependencies
 import io.ktor.server.plugins.di.resolve
-import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
-import io.ktor.server.util.getValue
 
 suspend fun Application.module() {
   dependencies {
-    provide<GitHubService> { GitHubHttp(client()) }
+    provide<HttpClient> { HttpClient() }
+    provide<GitHubService> { GitHubHttp(resolve<HttpClient>()) }
   }
   routes()
 }
 
 suspend fun Application.routes() {
   val github: GitHubService = dependencies.resolve()
-  routing {
-    get("/github/{username}") {
-      val username: String by call.pathParameters
-      github(github, username)
-    }
-  }
+  routing { profile(github) }
 }
 ```
 
@@ -641,6 +678,7 @@ configuration; lesson 9.
 - `client.get("/users/$user")`, `body<T>()` → a verb, a URL, a typed response
 - `coroutineScope { async { } }`, `awaitAll` → concurrent, not by accident
 - `withContext(Dispatchers.IO)`, `HttpTimeout` → blocking off the engine, waiting with a limit
+- `monitor.subscribe(ApplicationStopped)` → close what the application opened
 - `interface`, `AutoCloseable`, `by dependencies` → hidden, closed, provided
 
 > **Suspend all the way down.**

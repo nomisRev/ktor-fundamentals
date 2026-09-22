@@ -6,9 +6,7 @@ package presentation.snippets.lesson9.slide244
 import presentation.support.*
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
-import io.ktor.server.application.Application
 
-fun Application.module() {
-  val secret = environment.config.property("jwt.secret").getString()
-  val token: String = JWT.create().sign(Algorithm.HMAC256(secret))
-}
+val secret = "supersecret"
+
+val token: String = JWT.create().sign(Algorithm.HMAC256(secret))

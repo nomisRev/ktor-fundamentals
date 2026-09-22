@@ -12,8 +12,4 @@ import io.ktor.server.auth.jwt.jwt
 val jwtAuth = jwt<UserIdPrincipal>("auth-jwt") {
   realm = "Access to secrets"
   verifier(JWT.require(Algorithm.HMAC256(secret)).build())
-  validate { credential ->
-    val user = credential.payload.getClaim("username").asString()
-    if (user.isNullOrEmpty()) null else UserIdPrincipal(user)
-  }
 }

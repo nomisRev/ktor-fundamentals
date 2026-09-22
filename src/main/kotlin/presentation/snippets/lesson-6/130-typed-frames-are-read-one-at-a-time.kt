@@ -8,9 +8,6 @@ import io.ktor.server.routing.Route
 import io.ktor.server.websocket.receiveDeserialized
 import io.ktor.server.websocket.sendSerialized
 import io.ktor.server.websocket.webSocket
-import io.ktor.websocket.CloseReason
-import io.ktor.websocket.close
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 
 fun Route.greet() {
@@ -22,9 +19,6 @@ fun Route.greet() {
       }
     } catch (e: ClosedReceiveChannelException) {
       // the client closed the socket
-    } catch (e: CancellationException) {
-      close(CloseReason(CloseReason.Codes.GOING_AWAY, "Shutting down"))
-      throw e
     }
   }
 }

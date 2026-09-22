@@ -4,11 +4,16 @@
 package presentation.snippets.lesson5.slide103
 
 import presentation.support.*
+import io.ktor.client.call.body
 import io.ktor.client.request.get
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.response.respond
 import io.ktor.server.routing.RoutingContext
 
-suspend fun RoutingContext.github(user: String) {
-  client().use { client ->
-    val response = client.get("/users/$user")
+suspend fun HttpClient.github(user: String) {
+  val response = get("/users/$user")
+  when (response.status) {
+    HttpStatusCode.OK -> response.body<User>()
+    else -> TODO()
   }
 }

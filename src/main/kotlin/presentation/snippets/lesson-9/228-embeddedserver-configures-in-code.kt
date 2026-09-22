@@ -4,18 +4,10 @@
 package presentation.snippets.lesson9.slide228
 
 import presentation.support.*
-import io.ktor.server.engine.connector
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 
 fun main() {
-  embeddedServer(
-    Netty,
-    configure = {
-      connector {
-        host = "0.0.0.0"
-        port = 8080
-      }
-    },
-  ) { module() }.start(wait = true)
+  embeddedServer(Netty, port = 8080, host = "0.0.0.0") { module() }
+    .start(wait = true)
 }

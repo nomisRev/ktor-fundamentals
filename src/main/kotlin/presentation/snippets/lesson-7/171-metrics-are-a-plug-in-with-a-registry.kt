@@ -7,9 +7,6 @@ import presentation.support.*
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.metrics.micrometer.MicrometerMetrics
-import io.ktor.server.response.respond
-import io.ktor.server.routing.get
-import io.ktor.server.routing.routing
 import io.micrometer.prometheusmetrics.PrometheusConfig
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 
@@ -18,9 +15,6 @@ val prometheus = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
 fun Application.module() {
   install(MicrometerMetrics) {
     registry = prometheus
-  }
-  routing {
-    get("/metrics") { call.respond(prometheus.scrape()) }
   }
   routes()
 }
