@@ -398,26 +398,14 @@ fun client(): HttpClient = HttpClient(CIO) {
 }
 ```
 
-<!--
-The engine's own defaults are generous or infinite: a GitHub that
-accepts the connection and never answers keeps the handler, and the
-caller waiting on it, suspended for as long as it likes. Three numbers:
-`connectTimeoutMillis` to establish the connection,
-`socketTimeoutMillis` between two packets, `requestTimeoutMillis` for
-the whole request. A request that needs longer says so in its own block,
-`client.get(url) { timeout { requestTimeoutMillis = 30_000 } }`. An
-expired request throws `HttpRequestTimeoutException`, which is how the
-retry plug-in sees it.
--->
-
 ---
 
 # A service is an interface
 
 > Depend on the interface, never on the HTTP client
 
-<DrawnAnnotation text="suspend fun getUserInfo" label="`suspend` almost everywhere: the pipeline can wait on it" :geometry="{ label: { x: 0.78, y: 0.32, width: 0.32 } }" />
-<DrawnAnnotation text="List<Repo>?" label="`null` when there is no such user: no `HttpStatusCode` leaks out" :geometry="{ label: { x: 0.78, y: 0.53, width: 0.32 } }" />
+<DrawnAnnotation text="suspend fun getUserInfo" label="`suspend` almost everywhere: the pipeline can wait on it" :geometry="{ label: { x: 0.7008, y: 0.3196, width: 0.3200 } }" />
+<DrawnAnnotation text="List<Repo>?" label="`null` when there is no such user: no `HttpStatusCode` leaks out" color="var(--fundamentals-blue)" :geometry="{ label: { x: 0.7390, y: 0.5513, width: 0.3200 } }" />
 
 ```kotlin
 interface GitHubService {
@@ -439,10 +427,28 @@ several.
 
 ---
 
+# A service is an interface
+
+> Depend on the interface, never on the HTTP client
+
+```kotlin
+sealed interface CreateRepoResult
+data class Succces(val repo: Repo): CreateRepoResult
+data object UserNotFound : CreateRepoResult
+data object RepoAlreadyExists : CreateRepoResult
+
+interface GitHubService {
+  suspend fun getUserInfo(user: String): User?
+  suspend fun getUserRepos(user: String): List<Repo>?
+  suspend fun createRepo(user: String, repo: String): CreateRepoResult
+}
+```
+
+---
+
 # Handlers depend on the service
 
-<DrawnAnnotation text="github: GitHubService" label="A fake in tests, `GitHubHttp` in `module()`: the handler cannot tell" :geometry="{ label: { x: 0.8, y: 0.28, width: 0.28 } }" />
-<DrawnAnnotation text="async { github.getUserInfo(user) }" label="Still concurrent: the interface suspends, so `async` still applies" :geometry="{ label: { x: 0.8, y: 0.4, width: 0.28 } }" />
+<DrawnAnnotation text="github: GitHubService" label="A fake in tests, `GitHubHttp` in `module()`: the handler cannot tell" :geometry="{ label: { x: 0.6417, y: 0.2439, width: 0.2800 } }" />
 
 <SmartCast :line="7" text="found">
 
@@ -453,15 +459,19 @@ import io.ktor.server.routing.RoutingContext
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 
-suspend fun RoutingContext.github(github: GitHubService, user: String) =
-  coroutineScope {
-    val info = async { github.getUserInfo(user) }
-    val repos = async { github.getUserRepos(user) }
-    when (val found = info.await()) {
-      null -> call.respond(HttpStatusCode.NotFound)
-      else -> call.respond(Profile(found, repos.await().orEmpty()))
+fun Routing.profile(github: GitHubService) {
+  get("/profile") { 
+    val name: String by call.parameters
+    coroutineScope {
+      val info = async { github.getUserInfo(user) }
+      val repos = async { github.getUserRepos(user) }
+      when (val found = info.await()) {
+        null -> call.respond(HttpStatusCode.NotFound)
+        else -> call.respond(Profile(found, repos.await().orEmpty()))
+      }
     }
   }
+}
 ```
 
 </SmartCast>
@@ -586,7 +596,7 @@ magic-move
 # The DI plug-in provides the service
 
 <DrawnAnnotation text="suspend fun Application.module()" label="Modules may suspend: Ktor starts them in a coroutine" :geometry="{ label: { x: 0.76, y: 0.2, width: 0.36 } }" />
-<DrawnAnnotation text="dependencies.resolve()" label="Suspends until the provider has run: the same registry from another module" :geometry="{ label: { x: 0.74, y: 0.75, width: 0.4 } }" />
+<DrawnAnnotation text="dependencies.resolve()" label="Suspends until the provider has run: the same registry from another module" :geometry="{ label: { x: 0.7721, y: 0.6604, width: 0.4000 } }" />
 
 ```kotlin
 import io.ktor.server.application.Application
